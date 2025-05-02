@@ -3,6 +3,7 @@ from nbtlib import load, tag
 
 
 def nbt_to_dict(nbt_data):
+    """converts NBT data to a python dictionary."""
     if isinstance(nbt_data, tag.Compound):
         return {key: nbt_to_dict(value) for key, value in nbt_data.items()}
     elif isinstance(nbt_data, tag.List):
@@ -17,8 +18,8 @@ def nbt_to_dict(nbt_data):
         return nbt_data
     return str(nbt_data)
 
-
 def nbt_to_json(nbt_file, output_file):
+    """loads a NBT file, converts it to JSON and saves it."""
     schematic = load(nbt_file)
     schematic_dict = nbt_to_dict(schematic)
 
