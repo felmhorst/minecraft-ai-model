@@ -2,18 +2,19 @@ from pathlib import Path
 import json
 
 
-def get_property_combinations(d):
+base_path = Path(__file__).parent
+global_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'palette.json'
+global_reverse_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'palette-reverse.json'
 
+
+def get_property_combinations(d):
     def get_dict_without_key(d, key):
         d_copy = dict(d)
         d_copy.pop(key, None)
         return d_copy
 
-    # base case
     if not d:
         return ['']
-
-    # this iter
     key = next(iter(d))
     values = d[key]
     part_dict = get_dict_without_key(d, key)
@@ -28,13 +29,43 @@ def get_property_combinations(d):
     return combinations
 
 
+def can_be_powered(block_type):
+    return block_type.endswith(('_door', '_trapdoor'))
+
+
+def can_be_waterlogged(block_type):
+    return block_type.endswith(('_bars', '_fence', '_ladder', '_pane', '_slab', '_stairs', '_trapdoor', '_wall', '_wall_sign'))
+
+
+def get_runtime_variants(block_type, block):
+    runtime_variants = [block]
+
+    if can_be_powered(block_type):
+        variants_to_process = runtime_variants.copy()
+        runtime_variants = []
+        for variant in variants_to_process:
+            base = variant[:-1] if variant.endswith(']') else variant
+            runtime_variants.append(f'{base},powered=true]')
+            runtime_variants.append(f'{base},powered=false]')
+
+    if can_be_waterlogged(block_type):
+        variants_to_process = runtime_variants.copy()
+        runtime_variants = []
+        for variant in variants_to_process:
+            base = variant[:-1] if variant.endswith(']') else variant
+            runtime_variants.append(f'{base},waterlogged=true]')
+            runtime_variants.append(f'{base},waterlogged=false]')
+
+    return runtime_variants
+
+
 def get_block_configurations_from_variants(block_type, variants):
     configurations = []
     for config in variants.keys():
         if config != "":
             config = f'[{config}]'
         block = f'minecraft:{block_type}{config}'
-        configurations.append(block)
+        configurations += get_runtime_variants(block_type, block)
     return configurations
 
 
@@ -70,7 +101,6 @@ def get_block_configurations_from_multipart(block_type, multipart):
 
     return configurations
 
-
 def get_block_configurations_from_file(file_path):
     """returns a list of block configs from a file_path (/assets/minecraft/blockstates/<block>.json)"""
     file_name = file_path.stem
@@ -105,8 +135,18 @@ def convert_blockstates_to_palette(folder_path):
     return palette
 
 
-def generate_block_palette(folder_path):
-    palette = convert_blockstates_to_palette(folder_path)
-    with open('data/palette.json', 'w') as file:
+def generate_reverse_block_palette(palette):
+    reverse_palette = {}
+    for key, value in palette.items():
+        reverse_palette[value] = key
+    with open(global_reverse_palette_path, 'w') as file:
+        json.dump(reverse_palette, file)
+
+
+def generate_block_palette(blockstate_folder_path):
+    """saves a flat block palette with unique ids to data/palette/palette.json"""
+    palette = convert_blockstates_to_palette(blockstate_folder_path)
+    with open(global_palette_path, 'w') as file:
         json.dump(palette, file)
+    generate_reverse_block_palette(palette)
     print('Block palette saved to data/palette.json')

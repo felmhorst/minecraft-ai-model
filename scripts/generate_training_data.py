@@ -1,0 +1,18 @@
+from pathlib import Path
+from scripts.conversion.palette_conversion import to_global_palette
+from scripts.conversion.array_conversion import convert_1d_data_to_3d_array
+from scripts.training_data import save_training_data
+
+def generate_training_data(folder_path):
+    """generates a training data set"""
+    input_text = []
+    output = []
+    folder = Path(folder_path)
+    for file_path in folder.iterdir():
+        if not file_path.is_file():
+            continue
+        global_data = to_global_palette(file_path)
+        global_data_3d = convert_1d_data_to_3d_array(global_data, 16, 16, 16)
+        input_text.append('house')
+        output.append(global_data_3d)
+    save_training_data(input_text, output)
