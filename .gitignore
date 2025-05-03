@@ -17,5 +17,9 @@ build/
 
 .env
 .vscode
-/data/schematics/
-/data/
+
+/data/base-schematics/
+/data/schematics/*
+/data/training/*
+/data/output/*
+/data/model/*
