@@ -81,9 +81,6 @@ def generate_schematic(prompt):
     data_float = convert_3d_data_to_1d(data_3d)
     data_clamped = torch.clamp(data_float, min=0, max=MAX_ID)
     data = data_clamped.view(-1).to(torch.int).cpu().numpy()
-    for id in data:
-        if id < 0:
-            print(id)
     schematic = to_schematic_file(data)
     schematic.save(output_path, gzipped=True)
     print(f'Generated schematic to {output_path}')
