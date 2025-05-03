@@ -23,8 +23,8 @@ def generate_palette_mapping(local_palette):
     return palette_map
 
 
-def to_global_palette(nbt_file):
-    schematic = load(nbt_file)
+def to_global_palette(nbt_file_path):
+    schematic = load(nbt_file_path)
     blocks = schematic['Schematic']['Blocks']
     local_data = nbt_to_dict(blocks['Data'])
     local_palette = nbt_to_dict(blocks['Palette'])
