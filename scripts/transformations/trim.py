@@ -38,5 +38,5 @@ def trim_x(data_3d):
 
 
 def trim(data_3d):
-    """reduces the size by removing empty layers"""
+    """trims the layers by removing empty leading and trailing layers"""
     return trim_x(trim_z(trim_y(data_3d)))
