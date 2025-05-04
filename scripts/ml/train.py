@@ -49,7 +49,7 @@ def train_ml_model():
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)  # todo: make 1e-3
 
     # training
-    for epoch in range(5000):  # adjust as needed
+    for epoch in range(2000):  # adjust as needed
         model.train()
         total_loss = 0
         for x_batch, y_batch in dataloader:
