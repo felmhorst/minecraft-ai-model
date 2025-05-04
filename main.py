@@ -39,6 +39,7 @@ from scripts.transformations.transform import flip_data_x, flip_data_z, flip_dat
 
 
 # with open('data/base-schematics/base_1_shape_6_roof_1.schem', 'r') as file:
+from scripts.transformations.translate import translate
 from scripts.transformations.trim import trim
 
 """global_data = to_global_palette('data/base-schematics/base_1_shape_6_roof_1.schem')
@@ -52,6 +53,6 @@ print(f'Generated transformed schematic.')
 
 global_data = to_global_palette('data/schematics/test.schem')
 global_data_3d = convert_1d_data_to_3d_array(global_data, 16, 16, 16)
-trimmed_data = trim(global_data_3d)
-schematic = data_3d_to_schematic(trimmed_data)
+modified_data = translate(trim(global_data_3d), 1, 2, 3)
+schematic = data_3d_to_schematic(modified_data)
 schematic.save('data/output/transform.schem', gzipped=True)

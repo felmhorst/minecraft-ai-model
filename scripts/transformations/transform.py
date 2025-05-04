@@ -36,10 +36,6 @@ def flip_data_z(data_3d):
     return data_3d[:, ::-1, :]
 
 
-def translate_data(data_3d, x, y, z):
-    pass
-
-
 def augment_data(data_3d):
     augmented_data = [data_3d, flip_data_x(data_3d), flip_data_z(data_3d)]
     for data in augmented_data.copy():
