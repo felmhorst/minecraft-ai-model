@@ -6,6 +6,7 @@ from scripts.conversion.array_conversion import convert_3d_data_to_1d
 from scripts.ml.predict import predict
 from pathlib import Path
 
+from scripts.ml.train_gan import generate_voxel
 
 base_path = Path(__file__).parent
 output_path = base_path / '..' / 'data' / 'output' / 'generated.schem'
@@ -77,15 +78,30 @@ def is_valid_data(data, palette):
     return True
 
 
-MAX_ID = 12106  # todo: calculate based on global palette
+MAX_ID = 1105  # todo: calculate based on global palette
 
 
-def generate_schematic(prompt):
+def generate_schematic():
     """generates a schematic and saves it to data/output"""
-    data_3d = predict(prompt)
-    data_float = convert_3d_data_to_1d(data_3d)
-    data_clamped = torch.clamp(data_float, min=0, max=MAX_ID)
-    data = data_clamped.view(-1).to(torch.int).cpu().numpy()
-    schematic = to_schematic_file(data)
-    schematic.save(output_path, gzipped=True)
+    data_3d = generate_voxel()
+    save_as_schematic(data_3d, output_path)
+    # data_flat = convert_3d_data_to_1d(data_3d)
+    # schematic = to_schematic_file(data_flat)
+    # schematic.save(output_path, gzipped=True)
     print(f'Generated schematic to {output_path}')
+
+
+def save_as_schematic(data_3d, output_path):
+    shape = data_3d.shape
+    data_flat = convert_3d_data_to_1d(data_3d)
+
+    local_palette = {
+        "minecraft:air": 0,
+        "minecraft:dirt": 1
+    }
+
+    #local_data, local_palette = to_local_palette(data_flat)
+
+    schematic = to_schematic(data_flat, local_palette, shape[2], shape[0], shape[1])
+    schematic_file = File(schematic, root_name='Schematic')
+    schematic_file.save(output_path, gzipped=True)

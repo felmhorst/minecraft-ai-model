@@ -1,24 +1,21 @@
+import numpy as np
 import torch
-
-from scripts.training_data import load_training_data
-from scripts.ml.TextTo3D import TextTo3D
-from scripts.ml.train import text_to_tensor, build_vocab
+from scripts.ml.train_vae import VoxelVAE
 from pathlib import Path
+from scripts.transformations.randomize_data import get_random_dataset
 
 base_path = Path(__file__).parent
 model_file = base_path / '..' / '..' / 'data' / 'model' / 'model.pth'
 vocab_file = base_path / '..' / '..' / 'data' / 'model' / 'vocab.pkl'
 
 
-def predict(text):
-    input_text, output = load_training_data()
-    vocab = build_vocab(input_text)
-    # with open(vocab_file, "rb") as f:
-    #     vocab = pickle.load(f)
-    model = TextTo3D(vocab_size=len(vocab))  # make sure to re-init the model
+def predict():
+    model = VoxelVAE()
     model.load_state_dict(torch.load(model_file))
+    model.to('cpu')
     model.eval()
-
-    x = text_to_tensor(text, vocab).unsqueeze(0)
     with torch.no_grad():
-        return model(x)
+        z = torch.randn(1, model.latent_dim).to('cpu')
+        generated = model.decode(z)
+        generated_binary = (generated > 0.5).int()
+    return generated_binary.cpu().numpy().squeeze()  # shape: (N, 1, 16, 16, 16)

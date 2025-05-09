@@ -107,9 +107,9 @@ States:
   - half = bottom/top
 - Schematic:
   - east=true,north=false,south=false,west=true (for multipart)
-  - age= 0/1
+  - age= 0/1/2/3/4/5
   - leaves= large/small
-  - waterlogged
+  - waterlogged= true/false
 
 Problems:
 - wall_sign "facing" missing

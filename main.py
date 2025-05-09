@@ -1,9 +1,12 @@
-from scripts.conversion.array_conversion import convert_1d_data_to_3d_array, convert_3d_data_to_1d
+from scripts.conversion.array_conversion import convert_1d_data_to_3d_array
 from scripts.conversion.palette_conversion import to_global_palette
-from scripts.generate_schematic import generate_schematic, to_schematic_file, data_3d_to_schematic
+from scripts.generate_schematic import generate_schematic, to_schematic_file, data_3d_to_schematic, save_as_schematic
 from scripts.generate_training_data import generate_training_data
-from scripts.ml.train import train_ml_model
-from scripts.transformations.transform import flip_data_x, flip_data_z, flip_data_y, rotate_data
+from scripts.generation.generate_cube import generate_cube
+from scripts.ml.train_gan import train_gan, continue_training_gan
+from scripts.ml.train_vae import train
+from scripts.palette.generate_global_palette import save_block_types
+from scripts.transformations.randomize_data import randomize_data, get_random_data, get_random_dataset
 
 # convert nbt to json
 # nbt_to_json("data/schematics/house_1.nbt", "data/house_1-nbt.json")
@@ -31,11 +34,8 @@ from scripts.transformations.transform import flip_data_x, flip_data_z, flip_dat
 # 1. generate training data
 # generate_training_data('data/base-schematics')
 
-# 2. train model
-# train_ml_model()
-
-# 3. generate schematic
-# generate_schematic("house")
+continue_training_gan()
+generate_schematic()
 
 
 # with open('data/base-schematics/base_1_shape_6_roof_1.schem', 'r') as file:
@@ -51,8 +51,20 @@ schematic.save('data/output/transform.schem', gzipped=True)
 print(f'Generated transformed schematic.')
 """
 
-global_data = to_global_palette('data/schematics/test.schem')
+"""
+global_data = to_global_palette('data/base-schematics/base_1_shape_1_roof_1.schem')
 global_data_3d = convert_1d_data_to_3d_array(global_data, 16, 16, 16)
-modified_data = translate(trim(global_data_3d), 1, 2, 3)
-schematic = data_3d_to_schematic(modified_data)
-schematic.save('data/output/transform.schem', gzipped=True)
+# modified_data = randomize_data(global_data_3d)
+schematic = data_3d_to_schematic(global_data_3d)
+schematic.save('data/output/transform.schem', gzipped=True)"""
+
+# data_3d = get_random_data()
+# schematic = data_3d_to_schematic(data_3d)
+# schematic.save('data/output/transform.schem', gzipped=True)
+
+# save_block_types('data/blockstates')
+
+# data_3d = generate_cube()
+# save_as_schematic(data_3d, "data/output/dirt.schem")
+
+# save_as_schematic(get_random_dataset(1)[0], "data/output/dirt.schem")

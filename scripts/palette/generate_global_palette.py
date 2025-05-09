@@ -7,6 +7,10 @@ global_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'palette.js
 global_reverse_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'palette-reverse.json'
 
 
+block_type_palette = base_path / '..' / '..' / 'data' / 'palette' / 'block_types.json'
+block_type_palette_reverse = base_path / '..' / '..' / 'data' / 'palette' / 'block_types_reverse.json'
+
+
 def get_property_combinations(d):
     def get_dict_without_key(d, key):
         d_copy = dict(d)
@@ -150,3 +154,49 @@ def generate_block_palette(blockstate_folder_path):
         json.dump(palette, file)
     generate_reverse_block_palette(palette)
     print('Block palette saved to data/palette.json')
+
+
+def get_block_types_from_folder(folder_path):
+    """returns a list of block configs from a folder_path (/assets/minecraft/blockstates)"""
+    folder = Path(folder_path)
+    block_types = []
+    for file_path in folder.iterdir():
+        if not file_path.is_file():
+            continue
+        block_types.append(file_path.stem)
+    return block_types
+
+
+def save_block_types(blockstate_folder_path):
+    folder = Path(blockstate_folder_path)
+
+    # block_types = get_block_types_from_folder(blockstate_folder_path)
+    block_type_dict = {"air": "0"}
+    reverse_block_type_dict = {"0": "minecraft:air"}
+    i = 1
+
+    for file_path in folder.iterdir():
+        if not file_path.is_file():
+            continue
+        block_type = file_path.stem
+        if block_type == 'air':
+            continue
+        block_type_dict[block_type] = str(i)
+        reverse_block_type_dict[str(i)] = get_block_string(file_path)
+        i += 1
+    with open(block_type_palette, 'w') as file:
+        json.dump(block_type_dict, file)
+    with open(block_type_palette_reverse, 'w') as file:
+        json.dump(reverse_block_type_dict, file)
+
+def get_block_string(file_path):
+    with file_path.open('r') as file:
+        data = json.load(file)
+        if "variants" not in data:
+            return f'minecraft:{file_path.stem}'
+        variant = next(iter(data["variants"]))
+        if variant == "":
+            return f'minecraft:{file_path.stem}'
+        if can_be_waterlogged(file_path.stem):
+            return f'minecraft:{file_path.stem}[{variant},waterlogged=false]'
+        return f'minecraft:{file_path.stem}[{variant}]'
