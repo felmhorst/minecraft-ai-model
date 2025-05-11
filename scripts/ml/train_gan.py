@@ -202,12 +202,9 @@ def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_e
 
 
 def continue_training_gan():
-    # load models
     generator, discriminator, g_opt, d_opt, epoch = load_model()
-    # set to training mode
     generator.train()
     discriminator.train()
-    # continue training
     train_gan(generator, discriminator, g_opt, d_opt, epoch)
 
 

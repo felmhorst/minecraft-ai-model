@@ -6,6 +6,7 @@ from scripts.conversion.array_conversion import convert_3d_data_to_1d
 from scripts.ml.predict import predict
 from pathlib import Path
 
+from scripts.ml.train_diffusion_model import sample_diffusion_model
 from scripts.ml.train_gan import generate_voxel
 
 base_path = Path(__file__).parent
@@ -83,7 +84,7 @@ MAX_ID = 1105  # todo: calculate based on global palette
 
 def generate_schematic():
     """generates a schematic and saves it to data/output"""
-    data_3d = generate_voxel()
+    data_3d = sample_diffusion_model()
     save_as_schematic(data_3d, output_path)
     # data_flat = convert_3d_data_to_1d(data_3d)
     # schematic = to_schematic_file(data_flat)
