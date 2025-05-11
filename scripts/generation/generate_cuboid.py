@@ -2,7 +2,8 @@ import numpy as np
 import random
 
 
-def generate_cube():
+def generate_cuboid():
+    """generates a cuboid of random size"""
     grid = np.zeros((16, 16, 16), dtype=int)
 
     # Define cube size (minimum 3x3x3 to be hollow)

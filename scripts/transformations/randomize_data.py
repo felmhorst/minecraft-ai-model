@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 
-from scripts.generation.generate_cube import generate_cube
+from scripts.generation.generate_cuboid import generate_cuboid
 from scripts.training_data import load_training_data
 from scripts.transformations.flip import random_flip
 from scripts.transformations.rotate import random_rotate
@@ -29,7 +29,7 @@ def get_random_data():
 def get_random_dataset(size):
     outputs = []
     for i in range(size):
-        int_array = generate_cube()
+        int_array = generate_cuboid()
         float_array = int_array.astype(np.float32)
         outputs.append(float_array)
     return outputs

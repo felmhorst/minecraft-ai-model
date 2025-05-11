@@ -2,7 +2,7 @@ from scripts.conversion.array_conversion import convert_1d_data_to_3d_array
 from scripts.conversion.palette_conversion import to_global_palette
 from scripts.generate_schematic import generate_schematic, to_schematic_file, data_3d_to_schematic, save_as_schematic
 from scripts.generate_training_data import generate_training_data
-from scripts.generation.generate_cube import generate_cube
+from scripts.generation.generate_cuboid import generate_cuboid
 from scripts.ml.train_gan import train_gan, continue_training_gan
 from scripts.ml.train_vae import train
 from scripts.palette.generate_global_palette import save_block_types
@@ -34,7 +34,7 @@ from scripts.transformations.randomize_data import randomize_data, get_random_da
 # 1. generate training data
 # generate_training_data('data/base-schematics')
 
-continue_training_gan()
+# continue_training_gan()
 generate_schematic()
 
 
