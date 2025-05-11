@@ -136,17 +136,22 @@ class VoxelDataset(Dataset):
         return self.data[idx]
 
 
-def train_gan(generator=Generator3D(), discriminator=Discriminator3D(), latent_dim=128, epochs=200, batch_size=32,
-              lambda_gp=10, critic_iters=2):
+def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_epoch=0, latent_dim=128, epochs=100, batch_size=64,
+              lambda_gp=10, critic_iters=3):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    g_opt = optim.Adam(generator.parameters(), lr=5e-4, betas=(0.5, 0.9))  # 0.999 or 0.9?
-    d_opt = optim.Adam(discriminator.parameters(), lr=5e-4, betas=(0.5, 0.9))
-    # criterion = nn.BCELoss()
+    if generator is None:
+        generator = Generator3D
+    if discriminator is None:
+        discriminator = Discriminator3D
+    if g_opt is None:
+        g_opt = optim.Adam(generator.parameters(), lr=1e-4, betas=(0.5, 0.9))
+    if d_opt is None:
+        d_opt = optim.Adam(discriminator.parameters(), lr=1e-4, betas=(0.5, 0.9))
 
     generator.to(device)
     discriminator.to(device)
 
-    for epoch in range(epochs):
+    for epoch in range(last_epoch, last_epoch + epochs):
         real_data_np = get_random_dataset(512)
         dataset = VoxelDataset(real_data_np)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -188,41 +193,52 @@ def train_gan(generator=Generator3D(), discriminator=Discriminator3D(), latent_d
             g_loss_val.backward()
             g_opt.step()
 
-        print(f"Epoch {epoch + 1}/{epochs} | D Loss: {d_loss_val.item():.2f} | G Loss: {g_loss_val.item():.2f} | GP: {gp.item():.2f}")
+        print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {d_loss_val.item():.2f} | G Loss: {g_loss_val.item():.2f} | GP: {gp.item():.2f}")
 
         if epoch > 0 and epoch % 50 == 0:
-            save_model(generator, discriminator, f"-{epoch}")
+            save_model(generator, discriminator, g_opt, d_opt, epoch)
 
-    save_model(generator, discriminator)
+    save_model(generator, discriminator, g_opt, d_opt, epoch + 1)
 
 
 def continue_training_gan():
     # load models
-    generator = Generator3D()
-    generator.load_state_dict(torch.load("data/model/generator.pth"))
-    discriminator = Discriminator3D()
-    discriminator.load_state_dict(torch.load("data/model/discriminator.pth"))
+    generator, discriminator, g_opt, d_opt, epoch = load_model()
     # set to training mode
     generator.train()
     discriminator.train()
     # continue training
-    train_gan(generator, discriminator)
+    train_gan(generator, discriminator, g_opt, d_opt, epoch)
 
 
-def save_model(generator, discriminator, file_suffix=""):
-    torch.save(generator.state_dict(), f"data/model/generator{file_suffix}.pth")
-    torch.save(discriminator.state_dict(), f"data/model/discriminator{file_suffix}.pth")
+def save_model(generator, discriminator, g_opt, d_opt, epoch):
+    torch.save({
+        'generator': generator.state_dict(),
+        'discriminator': discriminator.state_dict(),
+        'g_optimizer': g_opt.state_dict(),
+        'd_optimizer': d_opt.state_dict(),
+        'epoch': epoch
+    }, f"data/model/checkpoint-{epoch}.pth")
     print("Checkpoint saved!")
 
 
-def load_model(file_path):
-    checkpoint = torch.load("data/model/checkpoint.pth")
+def load_model(file_path="data/model/checkpoint-200.pth"):
+    checkpoint = torch.load(file_path)
+    generator = Generator3D()
+    generator.load_state_dict(checkpoint['generator'])
+    discriminator = Discriminator3D()
+    discriminator.load_state_dict(checkpoint['discriminator'])
+    g_opt = optim.Adam(generator.parameters(), lr=5e-4, betas=(0.5, 0.9))
+    g_opt.load_state_dict(checkpoint['g_optimizer'])
+    d_opt = optim.Adam(discriminator.parameters(), lr=5e-4, betas=(0.5, 0.9))
+    d_opt.load_state_dict(checkpoint['d_optimizer'])
+    epoch = checkpoint['epoch']
+    return generator, discriminator, g_opt, d_opt, epoch
 
 
 def generate_voxel(generator=None, latent_dim=128, device='cpu'):
     if generator is None:
-        generator = Generator3D()
-        generator.load_state_dict(torch.load("data/model/generator.pth"))
+        generator, discriminator, g_opt, d_opt, epoch = load_model()
     generator.eval()
     with torch.no_grad():
         z = torch.randn(1, latent_dim).to(device)
