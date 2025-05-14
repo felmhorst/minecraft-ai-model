@@ -3,8 +3,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils import spectral_norm
 import torch.optim as optim
-import torch.nn.utils as utils
-from pathlib import Path
 
 from scripts.transformations.randomize_data import get_random_dataset
 
@@ -13,44 +11,26 @@ class Generator3D(nn.Module):
     def __init__(self, latent_dim=128):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(latent_dim, 16 * 4 * 4 * 4),
+            nn.Linear(latent_dim, 128 * 2 * 2 * 2),
             nn.ReLU(True),
 
-            nn.Unflatten(1, (16, 4, 4, 4)),  # 4x4x4
+            nn.Unflatten(1, (128, 2, 2, 2)),  # 2x2x2
+
+            nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1),  # 4x4x4
+            nn.BatchNorm3d(64),
+            nn.ReLU(True),
+
+            nn.ConvTranspose3d(64, 32, kernel_size=4, stride=2, padding=1),  # 8x8x8
+            nn.BatchNorm3d(32),
+            nn.ReLU(True),
+
+            nn.ConvTranspose3d(32, 16, kernel_size=4, stride=2, padding=1),  # 16x16x16
             nn.BatchNorm3d(16),
             nn.ReLU(True),
 
-            nn.ConvTranspose3d(16, 8, kernel_size=4, stride=2, padding=1),  # 8x8x8
-            nn.BatchNorm3d(8),
-            nn.ReLU(True),
-
-            nn.ConvTranspose3d(8, 1, kernel_size=4, stride=2, padding=1),  # 16x16x16
+            nn.Conv3d(16, 1, kernel_size=3, padding=1),  # 16x16x16
             nn.Sigmoid()
         )
-
-        # 200
-        """
-        nn.Linear(latent_dim, 512 * 4 * 4 * 4),
-        
-        nn.Unflatten(1, (512, 4, 4, 4)),  # 4x4x4
-        nn.BatchNorm3d(512),
-        nn.ReLU(True),
-        
-        nn.ConvTranspose3d(512, 256, kernel_size=4, stride=2, padding=1),  # 8x8x8
-        nn.BatchNorm3d(256),
-        nn.ReLU(True),
-        
-        nn.ConvTranspose3d(256, 128, kernel_size=4, stride=2, padding=1),  # 16x16x16
-        nn.BatchNorm3d(128),
-        nn.ReLU(True),
-        
-        nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1),  # 32x32x32
-        nn.BatchNorm3d(64),
-        nn.ReLU(True),
-        
-        nn.ConvTranspose3d(64, 1, kernel_size=4, stride=2, padding=1),  # 64x64x64
-        nn.Sigmoid()
-        """
 
     def forward(self, z):
         return self.model(z)
@@ -60,36 +40,18 @@ class Discriminator3D(nn.Module):
     def __init__(self):
         super().__init__()
         self.model = nn.Sequential(
-            spectral_norm(nn.Conv3d(1, 8, kernel_size=4, stride=2, padding=1)),  # 8x8x8
+            spectral_norm(nn.Conv3d(1, 16, kernel_size=4, stride=2, padding=1)),  # 8x8x8
             nn.LeakyReLU(0.2, inplace=True),
 
-            spectral_norm(nn.Conv3d(8, 16, kernel_size=4, stride=2, padding=1)),  # 4x4x4
-            nn.BatchNorm3d(16),
+            spectral_norm(nn.Conv3d(16, 32, kernel_size=4, stride=2, padding=1)),  # 4x4x4
+            nn.LeakyReLU(0.2, inplace=True),
+
+            spectral_norm(nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1)),  # 2x2x2
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Flatten(),
-            spectral_norm(nn.Linear(16 * 4 * 4 * 4, 1)),
+            spectral_norm(nn.Linear(64 * 2 * 2 * 2, 1)),
         )
-
-        """
-        nn.Conv3d(1, 64, kernel_size=4, stride=2, padding=1),  # 32x32x32
-        nn.LeakyReLU(0.2, inplace=True),
-        
-        nn.Conv3d(64, 128, kernel_size=4, stride=2, padding=1),  # 16x16x16
-        nn.BatchNorm3d(128),
-        nn.LeakyReLU(0.2, inplace=True),
-        
-        nn.Conv3d(128, 256, kernel_size=4, stride=2, padding=1),  # 8x8x8
-        nn.BatchNorm3d(256),
-        nn.LeakyReLU(0.2, inplace=True),
-        
-        nn.Conv3d(256, 512, kernel_size=4, stride=2, padding=1),  # 4x4x4
-        nn.BatchNorm3d(512),
-        nn.LeakyReLU(0.2, inplace=True),
-        
-        nn.Flatten(),
-        nn.Linear(512 * 4 * 4 * 4, 1),
-        """
 
     def forward(self, x):
         return self.model(x)
@@ -136,17 +98,17 @@ class VoxelDataset(Dataset):
         return self.data[idx]
 
 
-def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_epoch=0, latent_dim=128, epochs=100, batch_size=64,
+def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_epoch=0, latent_dim=128, epochs=200, batch_size=64,
               lambda_gp=10, critic_iters=3):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if generator is None:
-        generator = Generator3D
+        generator = Generator3D()
     if discriminator is None:
-        discriminator = Discriminator3D
+        discriminator = Discriminator3D()
     if g_opt is None:
-        g_opt = optim.Adam(generator.parameters(), lr=1e-4, betas=(0.5, 0.9))
+        g_opt = optim.Adam(generator.parameters(), lr=1e-5, betas=(0.5, 0.9))
     if d_opt is None:
-        d_opt = optim.Adam(discriminator.parameters(), lr=1e-4, betas=(0.5, 0.9))
+        d_opt = optim.Adam(discriminator.parameters(), lr=1e-5, betas=(0.5, 0.9))
 
     generator.to(device)
     discriminator.to(device)
@@ -195,7 +157,7 @@ def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_e
 
         print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {d_loss_val.item():.2f} | G Loss: {g_loss_val.item():.2f} | GP: {gp.item():.2f}")
 
-        if epoch > 0 and epoch % 50 == 0:
+        if epoch > 0 and epoch % 100 == 0:
             save_model(generator, discriminator, g_opt, d_opt, epoch)
 
     save_model(generator, discriminator, g_opt, d_opt, epoch + 1)
@@ -215,25 +177,26 @@ def save_model(generator, discriminator, g_opt, d_opt, epoch):
         'g_optimizer': g_opt.state_dict(),
         'd_optimizer': d_opt.state_dict(),
         'epoch': epoch
-    }, f"data/model/checkpoint-{epoch}.pth")
+    }, f"data/model/gan-checkpoint-{epoch}.pth")
     print("Checkpoint saved!")
 
 
-def load_model(file_path="data/model/checkpoint-200.pth"):
+def load_model(file_path="data/model/gan-checkpoint-300.pth"):
     checkpoint = torch.load(file_path)
     generator = Generator3D()
     generator.load_state_dict(checkpoint['generator'])
     discriminator = Discriminator3D()
     discriminator.load_state_dict(checkpoint['discriminator'])
-    g_opt = optim.Adam(generator.parameters(), lr=5e-4, betas=(0.5, 0.9))
+    g_opt = optim.Adam(generator.parameters(), lr=1e-5, betas=(0.5, 0.9))
     g_opt.load_state_dict(checkpoint['g_optimizer'])
-    d_opt = optim.Adam(discriminator.parameters(), lr=5e-4, betas=(0.5, 0.9))
+    d_opt = optim.Adam(discriminator.parameters(), lr=1e-5, betas=(0.5, 0.9))
     d_opt.load_state_dict(checkpoint['d_optimizer'])
     epoch = checkpoint['epoch']
+    print(f'Loading WGAN-SN (epoch {epoch})')
     return generator, discriminator, g_opt, d_opt, epoch
 
 
-def generate_voxel(generator=None, latent_dim=128, device='cpu'):
+def sample_gan(generator=None, latent_dim=128, device='cpu'):
     if generator is None:
         generator, discriminator, g_opt, d_opt, epoch = load_model()
     generator.eval()

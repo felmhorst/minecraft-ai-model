@@ -3,11 +3,13 @@ from nbtlib import Compound, File, Int, List, Short, ByteArray, IntArray
 from scripts.conversion.palette_conversion import to_local_palette
 import numpy as np
 from scripts.conversion.array_conversion import convert_3d_data_to_1d
+from scripts.generation.generate_cuboid import generate_cuboid
 from scripts.ml.predict import predict
 from pathlib import Path
 
-from scripts.ml.train_diffusion_model import sample_diffusion_model
-from scripts.ml.train_gan import generate_voxel
+# from scripts.ml.train_diffusion_model import sample_diffusion_model
+from scripts.ml.train_diffusion_model import sample_latent_diffusion
+from scripts.ml.train_gan import sample_gan
 
 base_path = Path(__file__).parent
 output_path = base_path / '..' / 'data' / 'output' / 'generated.schem'
@@ -84,7 +86,8 @@ MAX_ID = 1105  # todo: calculate based on global palette
 
 def generate_schematic():
     """generates a schematic and saves it to data/output"""
-    data_3d = sample_diffusion_model()
+    # data_3d = sample_latent_diffusion()
+    data_3d = sample_gan()
     save_as_schematic(data_3d, output_path)
     # data_flat = convert_3d_data_to_1d(data_3d)
     # schematic = to_schematic_file(data_flat)
@@ -96,9 +99,16 @@ def save_as_schematic(data_3d, output_path):
     shape = data_3d.shape
     data_flat = convert_3d_data_to_1d(data_3d)
 
+    """local_palette = {
+        "minecraft:air": 0,
+        "minecraft:glass": 1,
+        "minecraft:white_stained_glass": 2,
+        "minecraft:black_stained_glass": 3,
+        "minecraft:dirt": 4,
+    }"""
     local_palette = {
         "minecraft:air": 0,
-        "minecraft:dirt": 1
+        "minecraft:dirt": 1,
     }
 
     #local_data, local_palette = to_local_palette(data_flat)
