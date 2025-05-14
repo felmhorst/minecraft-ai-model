@@ -3,17 +3,18 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils import spectral_norm
 import torch.optim as optim
-
 from scripts.transformations.randomize_data import get_random_dataset
 
 
 class Generator3D(nn.Module):
     def __init__(self, latent_dim=128):
         super().__init__()
-        self.model = nn.Sequential(
+        self.latent_to_tensor = nn.Sequential(
             nn.Linear(latent_dim, 128 * 2 * 2 * 2),
-            nn.ReLU(True),
+            nn.ReLU(True)
+        )
 
+        self.upsample_blocks = nn.Sequential(
             nn.Unflatten(1, (128, 2, 2, 2)),  # 2x2x2
 
             nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1),  # 4x4x4
@@ -27,13 +28,32 @@ class Generator3D(nn.Module):
             nn.ConvTranspose3d(32, 16, kernel_size=4, stride=2, padding=1),  # 16x16x16
             nn.BatchNorm3d(16),
             nn.ReLU(True),
+        )
 
-            nn.Conv3d(16, 1, kernel_size=3, padding=1),  # 16x16x16
+        self.to_voxel = nn.Sequential(
+            nn.Conv3d(19, 1, kernel_size=3, padding=1),  # 16x16x16
             nn.Sigmoid()
         )
 
     def forward(self, z):
-        return self.model(z)
+        x = self.latent_to_tensor(z)
+        x = self.upsample_blocks(x)  # Shape: [B, 16, 16, 16, 16]
+
+        # Add positional encoding
+        B, _, D, H, W = x.shape
+        device = x.device
+        pos = self.get_positional_grid(D, device).unsqueeze(0).repeat(B, 1, 1, 1, 1)  # [B, 3, D, H, W]
+        x = torch.cat([x, pos], dim=1)  # [B, 19, D, H, W]
+
+        return self.to_voxel(x)
+
+    @staticmethod
+    def get_positional_grid(size, device):
+        """Generates 3-channel positional grid with values in [-1, 1]."""
+        ranges = [torch.linspace(-1, 1, steps=size, device=device) for _ in range(3)]
+        grid_z, grid_y, grid_x = torch.meshgrid(ranges, indexing='ij')
+        pos = torch.stack([grid_x, grid_y, grid_z], dim=0)  # [3, size, size, size]
+        return pos
 
 
 class Discriminator3D(nn.Module):
@@ -98,7 +118,7 @@ class VoxelDataset(Dataset):
         return self.data[idx]
 
 
-def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_epoch=0, latent_dim=128, epochs=200, batch_size=64,
+def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_epoch=0, latent_dim=128, epochs=600, batch_size=64,
               lambda_gp=10, critic_iters=3):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if generator is None:
@@ -181,15 +201,15 @@ def save_model(generator, discriminator, g_opt, d_opt, epoch):
     print("Checkpoint saved!")
 
 
-def load_model(file_path="data/model/gan-checkpoint-300.pth"):
+def load_model(file_path="data/model/gan-checkpoint-1000.pth"):
     checkpoint = torch.load(file_path)
     generator = Generator3D()
     generator.load_state_dict(checkpoint['generator'])
     discriminator = Discriminator3D()
     discriminator.load_state_dict(checkpoint['discriminator'])
-    g_opt = optim.Adam(generator.parameters(), lr=1e-5, betas=(0.5, 0.9))
+    g_opt = optim.Adam(generator.parameters(), lr=1e-6, betas=(0.5, 0.9))
     g_opt.load_state_dict(checkpoint['g_optimizer'])
-    d_opt = optim.Adam(discriminator.parameters(), lr=1e-5, betas=(0.5, 0.9))
+    d_opt = optim.Adam(discriminator.parameters(), lr=1e-6, betas=(0.5, 0.9))
     d_opt.load_state_dict(checkpoint['d_optimizer'])
     epoch = checkpoint['epoch']
     print(f'Loading WGAN-SN (epoch {epoch})')
