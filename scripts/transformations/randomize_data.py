@@ -1,8 +1,8 @@
 import random
-
 import numpy as np
-
 from scripts.generation.generate_cuboid import generate_cuboid
+from scripts.generation.generate_pyramid import generate_pyramid
+from scripts.generation.generate_sphere import generate_sphere
 from scripts.training_data import load_training_data
 from scripts.transformations.flip import random_flip
 from scripts.transformations.rotate import random_rotate
@@ -29,7 +29,9 @@ def get_random_data():
 def get_random_dataset(size):
     outputs = []
     for i in range(size):
-        int_array = generate_cuboid()
+        generate_data = random.choice([generate_cuboid, generate_pyramid, generate_sphere])
+        hollow = random.choice([True, False])
+        int_array = generate_data(hollow=hollow)
         float_array = int_array.astype(np.float32)
         outputs.append(float_array)
     return outputs
