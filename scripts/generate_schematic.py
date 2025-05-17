@@ -3,7 +3,7 @@ from nbtlib import Compound, File, Int, List, Short, ByteArray, IntArray
 from scripts.conversion.palette_conversion import to_local_palette
 import numpy as np
 from scripts.conversion.array_conversion import convert_3d_data_to_1d
-from scripts.generation.generate_cuboid import generate_cuboid
+from scripts.generation.generate_cuboid import generate_random_cuboid
 from scripts.ml.predict import predict
 from pathlib import Path
 
@@ -84,10 +84,10 @@ def is_valid_data(data, palette):
 MAX_ID = 1105  # todo: calculate based on global palette
 
 
-def generate_schematic():
+def generate_schematic(input_label):
     """generates a schematic and saves it to data/output"""
     # data_3d = sample_latent_diffusion()
-    data_3d = sample_gan()
+    data_3d = sample_gan(input_label)
     save_as_schematic(data_3d, output_path)
     # data_flat = convert_3d_data_to_1d(data_3d)
     # schematic = to_schematic_file(data_flat)

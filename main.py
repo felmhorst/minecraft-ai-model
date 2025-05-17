@@ -2,9 +2,9 @@ from scripts.conversion.array_conversion import convert_1d_data_to_3d_array
 from scripts.conversion.palette_conversion import to_global_palette
 from scripts.generate_schematic import generate_schematic, to_schematic_file, data_3d_to_schematic, save_as_schematic
 from scripts.generate_training_data import generate_training_data
-from scripts.generation.generate_cuboid import generate_cuboid
-from scripts.generation.generate_pyramid import generate_pyramid
-from scripts.generation.generate_sphere import generate_sphere
+from scripts.generation.generate_cuboid import generate_random_cuboid
+from scripts.generation.generate_pyramid import generate_random_pyramid
+from scripts.generation.generate_sphere import generate_random_sphere
 from scripts.ml.train_diffusion_model import train_latent_diffusion_model
 from scripts.ml.train_gan import train_gan, continue_training_gan
 from scripts.ml.train_vae import train
@@ -43,8 +43,9 @@ from scripts.transformations.randomize_data import randomize_data, get_random_da
 # generate_schematic()
 
 # train_gan()
-# continue_training_gan()
-# generate_schematic()
+generate_schematic("solid pyramid")
+continue_training_gan()
+# generate_schematic("solid cuboid")
 
 # with open('data/base-schematics/base_1_shape_6_roof_1.schem', 'r') as file:
 from scripts.transformations.translate import translate
@@ -72,7 +73,7 @@ schematic.save('data/output/transform.schem', gzipped=True)"""
 
 # save_block_types('data/blockstates')
 
-data_3d = get_random_dataset(1)[0]
-save_as_schematic(data_3d, "data/output/sphere.schem")
+# data_3d = get_random_dataset(1)[0]
+# save_as_schematic(data_3d, "data/output/sphere.schem")
 
 # save_as_schematic(get_random_dataset(1)[0], "data/output/dirt.schem")
