@@ -1,25 +1,15 @@
 import numpy as np
 
 
-def generate_cuboid(hollow=False, grid_size=16):
-    """generates a cuboid of random size"""
-    grid = np.zeros((grid_size, grid_size, grid_size), dtype=np.uint8)
-
-    # randomize size
-    size_x = np.random.randint(5, grid_size)
-    size_z = np.random.randint(5, grid_size)
-    height = np.random.randint(5, grid_size)
-
-    # randomize position
-    max_x = grid_size - size_x
-    max_z = grid_size - size_z
-    start_x = np.random.randint(0, max_x)
-    start_z = np.random.randint(0, max_z)
-    start_y = 0
-    end_x = start_x + size_x
-    end_z = start_z + size_z
+def generate_cuboid(position=(4, 4, 4), width=8, length=8, height=8, hollow=False, grid_size=16):
+    start_x = position[0]
+    start_y = position[1]
+    start_z = position[2]
+    end_x = start_x + width
+    end_z = start_z + length
     end_y = start_y + height
 
+    grid = np.zeros((grid_size, grid_size, grid_size), dtype=np.uint8)
     if end_y > grid_size:
         height = grid_size - start_y
         end_y = start_y + height
@@ -40,3 +30,22 @@ def generate_cuboid(hollow=False, grid_size=16):
                     grid[y, z, x] = 1
 
     return grid
+
+
+def generate_random_cuboid(hollow=False, grid_size=16):
+    """generates a cuboid of random size"""
+
+    # randomize size
+    width = np.random.randint(5, grid_size)
+    length = np.random.randint(5, grid_size)
+    height = np.random.randint(5, grid_size)
+
+    # randomize position
+    max_x = grid_size - width
+    max_z = grid_size - length
+    start_x = np.random.randint(0, max_x)
+    start_z = np.random.randint(0, max_z)
+    start_y = 0
+    position = [start_x, start_y, start_z]
+
+    return generate_cuboid(position, width, length, height, hollow, grid_size)

@@ -1,8 +1,8 @@
 import random
 import numpy as np
-from scripts.generation.generate_cuboid import generate_cuboid
-from scripts.generation.generate_pyramid import generate_pyramid
-from scripts.generation.generate_sphere import generate_sphere
+from scripts.generation.generate_cuboid import generate_random_cuboid, generate_cuboid
+from scripts.generation.generate_pyramid import generate_random_pyramid, generate_pyramid
+from scripts.generation.generate_sphere import generate_random_sphere, generate_sphere
 from scripts.training_data import load_training_data
 from scripts.transformations.flip import random_flip
 from scripts.transformations.rotate import random_rotate
@@ -27,11 +27,23 @@ def get_random_data():
 
 
 def get_random_dataset(size):
+    inputs = []
     outputs = []
     for i in range(size):
-        generate_data = random.choice([generate_cuboid, generate_pyramid, generate_sphere])
-        hollow = random.choice([True, False])
-        int_array = generate_data(hollow=hollow)
+        shapes = {
+            "cuboid": generate_random_cuboid,
+            "pyramid": generate_random_pyramid,
+        }
+        shape = random.choice(["cuboid", "pyramid"])
+
+        generate_shape = shapes[shape]
+        # hollow = random.choice([True, False])
+        hollow = False
+
+        int_array = generate_shape()
         float_array = int_array.astype(np.float32)
+
+        label = f"{'hollow' if hollow else 'solid'} {shape}"
+        inputs.append(label)
         outputs.append(float_array)
-    return outputs
+    return inputs, outputs
