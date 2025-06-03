@@ -18,6 +18,7 @@ def nbt_to_dict(nbt_data):
         return nbt_data
     return str(nbt_data)
 
+
 def nbt_to_json(nbt_file, output_file):
     """loads a NBT file, converts it to JSON and saves it."""
     schematic = load(nbt_file)

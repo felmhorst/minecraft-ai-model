@@ -1,13 +1,13 @@
 import json
 from nbtlib import load
 
-from scripts.conversion.block_representation_conversion import block_string_to_dict
+from scripts.palette.block_representation_conversion import block_string_to_dict
 from scripts.conversion.nbt_conversion import nbt_to_dict
 from pathlib import Path
 
 base_path = Path(__file__).parent
-global_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_types.json'
-global_reverse_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_types_reverse.json'
+global_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_type_to_id.json'
+global_reverse_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_id_to_type.json'
 WARNING = '\033[93m'
 DEFAULT = '\033[0m'
 
@@ -20,23 +20,24 @@ def generate_palette_mapping(local_palette):
     with open(global_palette_path, 'r') as file:
         global_palette = json.load(file)
         for block_string, local_id in local_palette.items():
-            block_dict = block_string_to_dict(block_string)
-            if block_dict["type"] not in global_palette:
-                print(f"{WARNING}Warning: Block '{block_dict['type']}' not found{DEFAULT}")
+            if block_string not in global_palette:
+                print(f"{WARNING}Warning: Block '{block_string}' not found{DEFAULT}")
                 continue
-            global_id = global_palette[block_dict["type"]]
+            global_id = global_palette[block_string]
             palette_map[local_id] = global_id
     return palette_map
 
 
-def to_global_palette(nbt_file_path):
+def to_global_palette_from_file(nbt_file_path):
     schematic = load(nbt_file_path)
     blocks = schematic['Schematic']['Blocks']
     local_data = nbt_to_dict(blocks['Data'])
     local_palette = nbt_to_dict(blocks['Palette'])
+    return to_global_palette(local_data, local_palette)
 
+
+def to_global_palette(local_data, local_palette):
     palette_mapping = generate_palette_mapping(local_palette)
-
     global_data = [palette_mapping.get(n, FALLBACK_ID) for n in local_data]
     return global_data
 

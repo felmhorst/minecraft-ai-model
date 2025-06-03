@@ -189,6 +189,7 @@ def save_block_types(blockstate_folder_path):
     with open(block_type_palette_reverse, 'w') as file:
         json.dump(reverse_block_type_dict, file)
 
+
 def get_block_string(file_path):
     with file_path.open('r') as file:
         data = json.load(file)

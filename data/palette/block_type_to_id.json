@@ -1,0 +1,11 @@
+{
+  "air": 0,
+  "stone_bricks": 1,
+  "stripped_spruce_log": 2,
+  "spruce_planks": 3,
+  "dark_oak_planks": 4,
+  "spruce_stairs": 5,
+  "dark_oak_stairs": 6,
+  "spruce_slab": 7,
+  "dark_oak_slab": 8
+}

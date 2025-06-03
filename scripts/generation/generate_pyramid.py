@@ -26,11 +26,14 @@ def generate_pyramid(position=(4, 4, 4), base_width=7, hollow=False, grid_size=1
                 if not hollow:
                     grid[y, z, x] = 1
                 else:
-                    is_edge = (
-                            x == x1 or x == x2 - 1 or
-                            z == z1 or z == z2 - 1
-                    )
-                    if is_edge or layer_width == 1:
+                    d_left = x - x1
+                    d_right = (x2 - 1) - x
+                    d_front = z - z1
+                    d_back = (z2 - 1) - z
+                    wall_thickness = 2
+                    # draw walls that are ≤ wall_thickness‑1 blocks thick
+                    if (min(d_left, d_right, d_front, d_back) < wall_thickness
+                            or layer_width <= wall_thickness * 2 - 1):
                         grid[y, z, x] = 1
 
     return grid

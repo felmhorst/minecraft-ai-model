@@ -1,15 +1,10 @@
-import torch
 from nbtlib import Compound, File, Int, List, Short, ByteArray, IntArray
 from scripts.conversion.palette_conversion import to_local_palette
 import numpy as np
 from scripts.conversion.array_conversion import convert_3d_data_to_1d
-from scripts.generation.generate_cuboid import generate_random_cuboid
-from scripts.ml.predict import predict
 from pathlib import Path
-
-# from scripts.ml.train_diffusion_model import sample_diffusion_model
-from scripts.ml.train_diffusion_model import sample_latent_diffusion
 from scripts.ml.train_gan import sample_gan
+from scripts.normalize_block_ids import denormalize_block_ids
 
 base_path = Path(__file__).parent
 output_path = base_path / '..' / 'data' / 'output' / 'generated.schem'
@@ -24,7 +19,7 @@ def data_3d_to_schematic(data_3d):
 def to_schematic(data_flat, palette, w=16, h=16, l=16):
     """turns the data and palette into a schematic"""
     nbt_palette = Compound({key: Int(value) for key, value in palette.items()})
-    data_flat = np.clip(data_flat, 0, 127)  # todo: handle bigger block palettes
+    # data_flat = np.clip(data_flat, 0, 127)  # todo: handle bigger block palettes
     nbt_data = ByteArray(data_flat)
 
     schematic = Compound({
@@ -86,8 +81,8 @@ MAX_ID = 1105  # todo: calculate based on global palette
 
 def generate_schematic(input_label):
     """generates a schematic and saves it to data/output"""
-    # data_3d = sample_latent_diffusion()
-    data_3d = sample_gan(input_label)
+    data_norm = sample_gan(input_label)
+    data_3d = denormalize_block_ids(data_norm)
     save_as_schematic(data_3d, output_path)
     # data_flat = convert_3d_data_to_1d(data_3d)
     # schematic = to_schematic_file(data_flat)
@@ -99,16 +94,16 @@ def save_as_schematic(data_3d, output_path):
     shape = data_3d.shape
     data_flat = convert_3d_data_to_1d(data_3d)
 
-    """local_palette = {
-        "minecraft:air": 0,
-        "minecraft:glass": 1,
-        "minecraft:white_stained_glass": 2,
-        "minecraft:black_stained_glass": 3,
-        "minecraft:dirt": 4,
-    }"""
     local_palette = {
         "minecraft:air": 0,
-        "minecraft:dirt": 1,
+        "minecraft:stone_bricks": 1,
+        "minecraft:spruce_log[axis=y]": 2,
+        "minecraft:spruce_planks": 3,
+        "minecraft:dark_oak_planks": 4,
+        "minecraft:spruce_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]": 5,
+        "minecraft:dark_oak_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]": 6,
+        "minecraft:spruce_slab[type=bottom,waterlogged=false]": 7,
+        "minecraft:dark_oak_slab[type=bottom,waterlogged=false]": 8
     }
 
     #local_data, local_palette = to_local_palette(data_flat)

@@ -1,0 +1,42 @@
+{
+  "air": {
+    "block": "air"
+  },
+  "stone_bricks": {
+    "block": "stone_bricks"
+  },
+  "stripped_spruce_log": {
+    "block": "spruce_log",
+    "axis": "y"
+  },
+  "spruce_planks": {
+    "block": "spruce_planks"
+  },
+  "dark_oak_planks": {
+    "block": "dark_oak_planks"
+  },
+  "spruce_stairs": {
+    "block": "spruce_stairs",
+    "facing": "east",
+    "half": "bottom",
+    "shape": "straight",
+    "waterlogged": "false"
+  },
+  "dark_oak_stairs": {
+    "block": "dark_oak_stairs",
+    "facing": "east",
+    "half": "bottom",
+    "shape": "straight",
+    "waterlogged": "false"
+  },
+  "spruce_slab": {
+    "block": "spruce_slab",
+    "type": "bottom",
+    "waterlogged": "false"
+  },
+  "dark_oak_slab": {
+    "block": "dark_oak_slab",
+    "type": "bottom",
+    "waterlogged": "false"
+  }
+}

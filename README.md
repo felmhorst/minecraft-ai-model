@@ -19,6 +19,9 @@
 **Notes:**
 - blockstates are taken from `%appdata%\.minecraft\versions\<version>\<version>.jar\assets\minecraft\blockstates` (jar must be unzipped)
 
+## Packages
+- CLIP: `pip install git+https://github.com/openai/CLIP.git`
+
 ## Getting Data
 - WorldEdit:
   - mark a section - `//schem copy` - `//schem save <name>`
