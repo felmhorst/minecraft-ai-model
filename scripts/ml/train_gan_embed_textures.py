@@ -35,10 +35,10 @@ class Generator3D(nn.Module):
     def __init__(self, latent_dim: int = 128):
         super().__init__()
 
-        input_dim = latent_dim + LABEL_EMBED_DIMENSIONS
+        input_dimensions = latent_dim + LABEL_EMBED_DIMENSIONS
 
         self.latent_to_tensor = nn.Sequential(
-            nn.Linear(input_dim, 128 * 2 * 2 * 2),
+            nn.Linear(input_dimensions, 128 * 2 * 2 * 2),
             nn.ReLU(True)
         )
 
@@ -52,9 +52,18 @@ class Generator3D(nn.Module):
         self.cbn3 = ConditionalBatchNorm3d(16, LABEL_EMBED_DIMENSIONS)
 
         # +3 for positional encoding
-        self.to_voxel = nn.Conv3d(16 + 3, NUM_TEXTURES, kernel_size=3, padding=1)
+        channels_with_positional_encoding = 16 + 3
 
-    def forward(self, z: torch.Tensor, label_embeddings: torch.Tensor) -> torch.Tensor:
+        # occupancy head to determine whether a block is solid
+        self.to_occupancy = nn.Conv3d(channels_with_positional_encoding, 1, kernel_size=3, padding=1)
+
+        # texture head to determine the block (other than air)
+        self.to_texture = nn.Conv3d(channels_with_positional_encoding, NUM_TEXTURES, kernel_size=3, padding=1)
+
+    def forward(
+            self,
+            z: torch.Tensor,
+            label_embeddings: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Calculates the logits (unnormalized scores) per texture in a batch of noisy voxel grids, based on a label.
         :param z: random noise, a tensor of shape [batch_size, latent_dim]
@@ -67,32 +76,37 @@ class Generator3D(nn.Module):
         x = self.latent_to_tensor(z)
         x = x.view(-1, 128, 2, 2, 2)  # [batch_size, 128, 2, 2, 2]
 
-        x = self.deconv1(x)  # [batch_size, 64, 4, 4, 4]
-        x = self.cbn1(x, label_embeddings)
-        x = torch.relu(x)
-
-        x = self.deconv2(x)  # [batch_size, 32, 8, 8, 8]
-        x = self.cbn2(x, label_embeddings)
-        x = torch.relu(x)
-
-        x = self.deconv3(x)  # [batch_size, 16, 16, 16, 16]
-        x = self.cbn3(x, label_embeddings)
-        x = torch.relu(x)
+        x = torch.relu(self.cbn1(self.deconv1(x), label_embeddings))  # [batch_size, 64, 4, 4, 4]
+        x = torch.relu(self.cbn2(self.deconv2(x), label_embeddings))  # [batch_size, 32, 8, 8, 8]
+        x = torch.relu(self.cbn3(self.deconv3(x), label_embeddings))  # [batch_size, 16, 16, 16, 16]
 
         # add positional encoding
         B, _, D, H, W = x.shape
-        device = x.device
-        pos = self.get_positional_grid(D, device).unsqueeze(0).repeat(B, 1, 1, 1, 1)
+        pos = self.get_positional_grid(D, x.device).unsqueeze(0).repeat(B, 1, 1, 1, 1)
         x = torch.cat([x, pos], dim=1)  # [batch_size, 19, 16, 16, 16] (added 3 channels for positional encoding)
 
-        return self.to_voxel(x)  # [batch_size, NUM_TEXTURES, 16, 16, 16] (likelihood per texture)
+        occupancy_logits = self.to_occupancy(x)  # [batch_size, 1, 16, 16, 16]
+        texture_logits = self.to_texture(x)      # [batch_size, NUM_TEXTURES, 16, 16, 16]
 
-    def sample_texture_ids(self, z: torch.Tensor, label_embeddings: torch.Tensor) -> torch.Tensor:
-        logits = self.forward(z, label_embeddings)
-        return torch.argmax(logits, dim=1)  # [batch_size, 16, 16, 16] (texture ids)
+        return occupancy_logits, texture_logits
+
+    def sample_texture_ids(
+            self,
+            z: torch.Tensor,
+            label_embeddings: torch.Tensor) -> torch.Tensor:
+        """Samples outputs based on a (randomized) input tensor z and text prompt."""
+        occupancy_logits, texture_logits = self.forward(z, label_embeddings)
+
+        occupancy = (torch.sigmoid(occupancy_logits) > 0.5).long()   # [batch_size, 1, 16, 16, 16]
+        texture = torch.argmax(texture_logits, dim=1, keepdim=True)  # [batch_size, 1, 16, 16, 16]
+
+        voxel_ids = texture * occupancy  # [batch_size, 16, 16, 16]
+        return voxel_ids
 
     @staticmethod
-    def get_positional_grid(size: int, device: str) -> torch.Tensor:
+    def get_positional_grid(
+            size: int,
+            device: str | torch.device) -> torch.Tensor:
         """returns a tensor of shape [3, size, size, size] that represents a 3D positional grid of normalized
         coordinates in the range [-1, 1]"""
         ranges = [torch.linspace(-1, 1, steps=size, device=device) for _ in range(3)]  # 3 x [size] in range [-1, 1]
@@ -107,8 +121,10 @@ class Discriminator3D(nn.Module):
         # max_norm caps the embedding
         self.texture_embedding = nn.Embedding(NUM_TEXTURES, TEXTURE_EMBED_DIMENSIONS, max_norm=1.0)
 
+        in_channels = TEXTURE_EMBED_DIMENSIONS + 1  # texture embedding + occupancy
+
         self.conv_layers = nn.Sequential(
-            nn.Conv3d(TEXTURE_EMBED_DIMENSIONS, 16, kernel_size=4, stride=2, padding=1),  # [batch_size, 16, 8, 8, 8]
+            nn.Conv3d(in_channels, 16, kernel_size=4, stride=2, padding=1),  # [batch_size, 16, 8, 8, 8]
             # spectral_norm(nn.Conv3d(TEXTURE_EMBED_DIMENSIONS, 16, kernel_size=4, stride=2, padding=1)),
             nn.LeakyReLU(0.2, inplace=True),
 
@@ -126,26 +142,52 @@ class Discriminator3D(nn.Module):
 
         self.embed_proj = nn.Linear(LABEL_EMBED_DIMENSIONS, 64 * 2 * 2 * 2)  # [batch_size, 512]
 
-    def forward(self, x: torch.Tensor, label_embeddings: torch.Tensor, already_embedded: bool = False):
+    def forward(
+            self,
+            occupancy: torch.Tensor,
+            texture_logits: torch.Tensor,
+            label_embeddings: torch.Tensor,
+            already_embedded: bool = False) -> torch.Tensor:
         """
         Calculates the Wasserstein critic values for a batch of samples.
-        :param x: tensor of shape [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16] (if already_embedded)
+        :param occupancy: tensor of shape [batch_size, 1, 16, 16, 16]
+        :param texture_logits: tensor of shape [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16] (if already_embedded)
         :param label_embeddings: tensor of shape [batch_size, LABEL_EMBED_DIMENSIONS]
         :param already_embedded: boolean
         :return: tensor of shape [batch_size], where each entry is the Wasserstein critic value for that sample
         """
-
         # embed texture_id to [TEXTURE_EMBED_DIMENSIONS]
         if not already_embedded:
-            x = self.texture_embedding(x)  # [batch_size, 16, 16, 16, TEXTURE_EMBED_DIMENSIONS]
-            x = x.permute(0, 4, 1, 2, 3)   # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+            texture_logits = self.texture_embedding(texture_logits)  # [batch_size, 16, 16, 16, TEXTURE_EMBED_DIMENSIONS]
+            texture_logits = texture_logits.permute(0, 4, 1, 2, 3)   # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
 
+        # combine occupancy and texture
+        x = torch.cat([occupancy.float(), texture_logits], dim=1)
         batch_size = x.size(0)
         features = self.conv_layers(x).reshape(batch_size, -1)  # [batch_size, 512]
 
         out = self.fc(features).squeeze(1)  # [batch_size]
 
         # evaluate label consistency
+        projection = torch.sum(self.embed_proj(label_embeddings) * features, dim=1)  # [batch_size]
+
+        return out + projection  # [batch_size]
+
+    def forward_combined_embeddings(
+            self,
+            x: torch.Tensor,
+            label_embeddings: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass when inputs are already concatenated occupancy+texture embeddings.
+        :param x: [batch_size, 1+TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+        :param label_embeddings: [batch_size, LABEL_EMBED_DIMENSIONS]
+        :return: tensor of shape [batch_size], where each entry is the Wasserstein critic value for that sample
+
+        """
+        batch_size = x.size(0)
+        features = self.conv_layers(x).reshape(batch_size, -1)  # [batch_size, 512]
+
+        out = self.fc(features).squeeze(1)  # [batch_size]
         projection = torch.sum(self.embed_proj(label_embeddings) * features, dim=1)  # [batch_size]
 
         return out + projection  # [batch_size]
@@ -175,45 +217,53 @@ def calculate_generator_loss(fake_scores: torch.Tensor) -> torch.Tensor:
 
 def calculate_gradient_penalty(
         discriminator: Discriminator3D,
-        real: torch.Tensor,
-        fake_logits: torch.Tensor,
+        real_occupancy: torch.Tensor,
+        real_textures: torch.Tensor,
+        fake_occupancy_logits: torch.Tensor,
+        fake_texture_logits: torch.Tensor,
         label_embeddings: torch.Tensor,
-        device: str = 'cpu') -> torch.Tensor:
+        device: str | torch.device = 'cpu',
+) -> torch.Tensor:
     """
     Calculates the gradient penalty.
     :param discriminator: Discriminator3D
-    :param real: batch of real samples, tensor of shape [batch_size, 16, 16, 16]
-    :param fake_logits: batch of logits from generator, tensor of shape [batch_size, NUM_TEXTURES, 16, 16, 16]
+    :param real_occupancy: batch of real occupancies, tensor of shape [batch_size, 1, 16, 16, 16]
+    :param real_textures: batch of real texture ids, tensor of shape [batch_size, 16, 16, 16]
+    :param fake_occupancy_logits: batch of occupancy logits from generator, tensor of shape [batch_size, 1, 16, 16, 16]
+    :param fake_texture_logits: batch of texture logits from generator, tensor of shape
+        [batch_size, NUM_TEXTURES, 16, 16, 16]
     :param label_embeddings: tensor of shape [batch_size, LABEL_EMBED_DIMENSIONS]
     :param device: cpu or cuda
     :return: gradient penalty of shape [] (a single scalar)
     """
+
     # get a random scalar per sample in the batch
-    batch_size = real.size(0)
+    batch_size = real_occupancy.size(0)
     epsilon = torch.rand(batch_size, 1, 1, 1, 1, device=device)  # [batch_size, 1, 1, 1, 1]
 
-    # get embedded representations
-    # fake_embed = discriminator.texture_embedding(fake)  # (B, D, H, W, C)
-    # real_embed = discriminator.texture_embedding(real)  # (B, D, H, W, C)
-    # real_embed = real_embed.permute(0, 4, 1, 2, 3)
-    # fake_embed = fake_embed.permute(0, 4, 1, 2, 3)
-
     # embed textures (real batch)
-    real_embed = discriminator.texture_embedding(real).permute(0, 4, 1, 2, 3)  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+    real_texture_embed = discriminator.texture_embedding(real_textures).permute(0, 4, 1, 2, 3)  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
 
     # embed textures (generated batch)
-    fake_probs = torch.softmax(fake_logits / TEMPERATURE, dim=1)  # [batch_size, NUM_TEXTURES, 16, 16, 16] (ratios)
-    fake_embed = torch.einsum("bndhw,ne->bedhw", fake_probs, discriminator.texture_embedding.weight)  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+    fake_texture_probs = torch.softmax(fake_texture_logits / TEMPERATURE, dim=1)  # [batch_size, NUM_TEXTURES, 16, 16, 16] (ratios)
+    fake_texture_embed = torch.einsum("bndhw,ne->bedhw", fake_texture_probs, discriminator.texture_embedding.weight)  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+
+    fake_occupancy_probs = torch.sigmoid(fake_occupancy_logits).float()  # [batch_size, 1, 16, 16, 16]
+    real_occupancy_float = real_occupancy.float()  # [batch_size, 1, 16, 16, 16]
+
+    # combine occupancy + texture
+    real_x = torch.cat([real_occupancy_float, real_texture_embed], dim=1)
+    fake_x = torch.cat([fake_occupancy_probs, fake_texture_embed], dim=1)
 
     # interpolate gradients between real and fake
-    interpolated = epsilon * real_embed + (1 - epsilon) * fake_embed  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+    interpolated = epsilon * real_x + (1 - epsilon) * fake_x  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
     interpolated.requires_grad_(True)
 
     # calculate critic value
-    d_interpolated = discriminator(interpolated, label_embeddings, already_embedded=True)  # [batch_size]
+    d_interpolated = discriminator.forward_combined_embeddings(interpolated, label_embeddings)  # [batch_size]
 
     # compute gradients for every sample
-    # gradients has shape [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+    # gradients has shape [batch_size, 1+TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
     gradients = torch.autograd.grad(
         outputs=d_interpolated,
         inputs=interpolated,
@@ -223,23 +273,39 @@ def calculate_gradient_penalty(
         only_inputs=True
     )[0]
 
-    # compute gradient penalty
-    gradients = gradients.reshape(batch_size, -1)  # [batch_size, TEXTURE_EMBED_DIMENSIONS*16*16*16]
-    gradients_norm = gradients.norm(2, dim=1)  # [batch_size]
-    gradient_penalty = ((gradients_norm - 1) ** 2).mean()  # [] (single scalar)
+    # compute per-voxel squared norms
+    gradients_sq = gradients.pow(2)  # [batch_size, 1+TEXTURE_EMBED_DIM, 16, 16, 16]
+
+    # compute squared occupancy gradient
+    occupancy_per_voxel_sq = gradients_sq[:, 0, ...]  # [batch_size, 16, 16, 16]
+    occupancy_gradient_sq = occupancy_per_voxel_sq.sum(dim=[1, 2, 3])  # [batch_size]
+
+    # computed weighted squared texture gradient
+    # the texture's gradient depends on the occupancy. an occupancy closer to 1 is more heavily penalized
+    texture_per_voxel_sq = gradients_sq[:, 1:, ...].sum(dim=1)  # [batch_size, 16, 16, 16]
+    occupancy_interpolated = interpolated[:, 0, ...]  # [batch_size, 16, 16, 16]
+    weighted_texture_sq = texture_per_voxel_sq * occupancy_interpolated  # [batch_size, 16, 16, 16]
+    texture_gradient_sq = weighted_texture_sq.sum(dim=[1, 2, 3])  # [batch_size]
+
+    # combine gradients + compute penalty
+    gradient_norm = torch.sqrt(occupancy_gradient_sq + texture_gradient_sq + 1e-12)  # todo
+    gradient_penalty = ((gradient_norm - 1) ** 2).mean()  # [] (single scalar)
     return gradient_penalty
 
 
 class VoxelDataset(Dataset):
-    def __init__(self, voxel_data: torch.Tensor, clip_embs: torch.Tensor):
-        self.data = torch.tensor(np.array(voxel_data)).long()  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
-        self.clip_embs = clip_embs  # [batch_size, LABEL_EMBED_DIMENSIONS]
+    def __init__(self, voxel_grid: torch.Tensor, clip_embeddings: torch.Tensor):
+        self.data = torch.tensor(np.array(voxel_grid)).long()  # [batch_size, 16, 16, 16]
+        self.clip_embeddings = clip_embeddings  # [batch_size, LABEL_EMBED_DIMENSIONS]
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx: int):
-        return self.data[idx], self.clip_embs[idx]
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        voxel_grid = self.data[idx]  # [16, 16, 16]
+        occupancy_grid = (voxel_grid > 0).long().unsqueeze(0)  # [1, 16, 16, 16]
+        texture_grid = voxel_grid.long()
+        return occupancy_grid, texture_grid, self.clip_embeddings[idx]
 
 
 def train_gan(
@@ -301,55 +367,72 @@ def train_gan(
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
         # batch
-        for i, (real, clip_embs) in enumerate(dataloader):
-            real = real.to(device).long()
+        for i, (real_occupancy, real_textures, clip_embs) in enumerate(dataloader):
+            real_occupancy = real_occupancy.to(device).long()
+            real_textures = real_textures.to(device).long()
             clip_embs = clip_embs.to(device)
-            batch_size_current = real.size(0)
+            batch_size_current = real_occupancy.size(0)
 
             # train discriminator
             for _ in range(discriminator_iterations):
                 z = torch.randn(batch_size_current, latent_dim).to(device)
-                fake_logits = generator(z, clip_embs).detach()
+                occupancy_logits, texture_logits = generator(z, clip_embs)
+                occupancy_logits = occupancy_logits.detach()
+                texture_logits = texture_logits.detach()
+                occupancy_probabilities = torch.sigmoid(occupancy_logits)
+                fake_occupancy = (occupancy_probabilities > 0.5).long()
 
                 # real_embed and fake_embed are handled inside gradient_penalty
-                real_scores = discriminator(real, clip_embs)  # IDs → embedded internally
-                fake_probs = torch.softmax(fake_logits / TEMPERATURE, dim=1)
-                fake_embed = torch.einsum("bndhw,ne->bedhw", fake_probs, discriminator.texture_embedding.weight)
-                fake_scores = discriminator(fake_embed, clip_embs, already_embedded=True)
+                real_scores = discriminator(real_occupancy, real_textures, clip_embs)  # IDs → embedded internally
+                fake_texture_probs = torch.softmax(texture_logits / TEMPERATURE, dim=1)
+                fake_texture_embed = torch.einsum("bndhw,ne->bedhw", fake_texture_probs, discriminator.texture_embedding.weight)
+                fake_scores = discriminator(fake_occupancy, fake_texture_embed, clip_embs, already_embedded=True)
 
-                gp = calculate_gradient_penalty(discriminator, real, fake_logits, clip_embs, device=device)
-                d_loss_val = calculate_discriminator_loss(real_scores, fake_scores) + lambda_gp * gp
+                gp = calculate_gradient_penalty(discriminator, real_occupancy, real_textures, occupancy_logits, texture_logits, clip_embs, device=device)
+                discriminator_loss = calculate_discriminator_loss(real_scores, fake_scores) + lambda_gp * gp
 
                 discriminator_optimiser.zero_grad()
-                d_loss_val.backward()
+                discriminator_loss.backward()
                 discriminator_optimiser.step()
 
             # train generator
             for _ in range(generator_iterations):
                 z = torch.randn(batch_size_current, latent_dim).to(device)
-                fake_logits = generator(z, clip_embs)
+                occupancy_logits, texture_logits = generator(z, clip_embs)
 
-                fake_probs = torch.softmax(fake_logits / TEMPERATURE, dim=1)
-                fake_embed = torch.einsum("bndhw,ne->bedhw", fake_probs, discriminator.texture_embedding.weight)
+                fake_texture_probs = torch.softmax(texture_logits / TEMPERATURE, dim=1)
+                fake_texture_embed = torch.einsum("bndhw,ne->bedhw", fake_texture_probs, discriminator.texture_embedding.weight)
 
-                # fake = torch.argmax(fake_logits, dim=1).long()
+                fake_scores = discriminator(occupancy_logits, fake_texture_embed, clip_embs, already_embedded=True)
 
-                fake_scores = discriminator(fake_embed, clip_embs, already_embedded=True)
+                # calculate occupancy loss
+                occupancy_loss = nn.functional.binary_cross_entropy_with_logits(occupancy_logits, real_occupancy.float())
 
-                # entropy regularization (prevents collapsing to too few textures)
-                entropy = - (fake_probs * (fake_probs + 1e-12).log()).sum(dim=1).mean()
-                delta_entropy = 0.05
-                g_loss_val = calculate_generator_loss(fake_scores) - delta_entropy * entropy
+                # calculate texture loss (where occupancy > 0)
+                mask = (real_textures > 0)  # [batch_size, 16, 16, 16]
+                if mask.any():
+                    texture_logits = texture_logits.permute(0, 2, 3, 4, 1)  # [batch_size, 16, 16, 16, NUM_TEXTURES]
+                    texture_loss = nn.functional.cross_entropy(texture_logits[mask], real_textures[mask])
+                else:
+                    texture_loss = torch.tensor(0.0, device=device)
+
+                # calculate generator loss
+                adversarial_loss = calculate_generator_loss(fake_scores)
+
+                # combine losses
+                alpha_occupancy = .7
+                alpha_texture = .3
+                generator_loss = adversarial_loss + alpha_occupancy * occupancy_loss + alpha_texture * texture_loss
 
                 generator_optimiser.zero_grad()
-                g_loss_val.backward()
+                generator_loss.backward()
                 generator_optimiser.step()
 
-        print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {d_loss_val.item():.2f} | G Loss: {g_loss_val.item():.2f} | GP: {gp.item():.2f}")
+        print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {discriminator_loss.item():.2f} | G Loss: {generator_loss.item():.2f} | GP: {gp.item():.2f}")
 
         # test generator results (to catch mode collapse early)
-        probabilities = torch.softmax(fake_logits / TEMPERATURE, dim=1)
-        ids, counts = torch.argmax(fake_logits, dim=1).unique(return_counts=True)
+        probabilities = torch.softmax(texture_logits / TEMPERATURE, dim=1)
+        ids, counts = torch.argmax(texture_logits, dim=1).unique(return_counts=True)
         avg_probabilities = probabilities.mean(dim=(0, 2, 3, 4)).detach().cpu().numpy()
         print("\tClasses: ", ids.detach().cpu().numpy())
         print("\tCounts:  ", counts.detach().cpu().numpy())
