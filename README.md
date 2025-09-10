@@ -1,5 +1,11 @@
 # Minecraft Schematic Generator
 
+This is an attempt to generate 3D Minecraft Structures. While other attempts are typically trained on non-NBT data like
+images or 3D models that are then converted to Minecraft NBT data, this project attempts to train a model on native NBT
+data for more minecraft-typical structures.
+
+This project currently uses a Wasserstein GAN with gradient penalty and spectral normalization.
+
 ## Project Structure
 ```
 ├── minecraft-ai/
@@ -13,8 +19,14 @@
 │   │   ├── conversion/   # data type & palette converisons
 │   │   ├── ml/           # model training & prediction
 │   │   └── palette/      # block palette
+│   ├── TRAINING_DATA.md  # types of training data, how its obtained & used
 │   └── main.py
 ```
+
+## Getting started
+- (optional) Install cuda for your device
+  - install cuda toolkit for you GPU, for example from [nvidia](https://developer.nvidia.com/cuda-downloads)
+  - install [pytorch with cuda](https://pytorch.org/get-started/locally/)
 
 **Notes:**
 - blockstates are taken from `%appdata%\.minecraft\versions\<version>\<version>.jar\assets\minecraft\blockstates` (jar must be unzipped)

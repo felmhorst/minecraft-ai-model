@@ -3,7 +3,8 @@ from scripts.conversion.palette_conversion import to_local_palette
 import numpy as np
 from scripts.conversion.array_conversion import convert_3d_data_to_1d
 from pathlib import Path
-from scripts.ml.train_gan import sample_gan
+# from scripts.ml.train_gan import sample_gan
+from scripts.ml.train_gan_embed_textures import sample_gan
 from scripts.normalize_block_ids import denormalize_block_ids
 
 base_path = Path(__file__).parent
@@ -82,8 +83,8 @@ MAX_ID = 1105  # todo: calculate based on global palette
 def generate_schematic(input_label):
     """generates a schematic and saves it to data/output"""
     data_norm = sample_gan(input_label)
-    data_3d = denormalize_block_ids(data_norm)
-    save_as_schematic(data_3d, output_path)
+    # data_3d = denormalize_block_ids(data_norm)
+    save_as_schematic(data_norm, output_path)
     # data_flat = convert_3d_data_to_1d(data_3d)
     # schematic = to_schematic_file(data_flat)
     # schematic.save(output_path, gzipped=True)

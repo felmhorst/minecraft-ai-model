@@ -5,22 +5,27 @@ from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils import spectral_norm
 import torch.optim as optim
 import clip
-
 from scripts.get_random_training_dataset import get_random_training_dataset
-from scripts.normalize_block_ids import get_max_block_id
+from scripts.normalize_block_ids import get_max_block_id, denormalize_block_ids
+
+MODEL_NAME = "WGAN-GP"
+LABEL_EMBED_DIMENSIONS = 512  # CLIP ViT-B/32
+NUM_TEXTURES = get_max_block_id() + 1
+TEXTURE_EMBED_DIMENSIONS = 4
 
 
 class ConditionalBatchNorm3d(nn.Module):
-    def __init__(self, num_features, embed_dim):
+    """a variant of BatchNorm3d that includes a label embedding"""
+    def __init__(self, num_features, embed_dimensions):
         super().__init__()
         self.bn = nn.BatchNorm3d(num_features, affine=False)
-        self.gamma_embed = nn.Linear(embed_dim, num_features)
-        self.beta_embed = nn.Linear(embed_dim, num_features)
+        self.gamma_embed = nn.Linear(embed_dimensions, num_features)
+        self.beta_embed = nn.Linear(embed_dimensions, num_features)
 
-    def forward(self, x, label_emb):
+    def forward(self, x, label_embed):
         out = self.bn(x)
-        gamma = self.gamma_embed(label_emb).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-        beta = self.beta_embed(label_emb).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+        gamma = self.gamma_embed(label_embed).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+        beta = self.beta_embed(label_embed).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
         return gamma * out + beta
 
 
@@ -28,10 +33,7 @@ class Generator3D(nn.Module):
     def __init__(self, latent_dim=128):
         super().__init__()
 
-        # label embeddings
-        self.embed_dim = 512  # CLIP ViT-B/32 output size
-
-        input_dim = latent_dim + self.embed_dim
+        input_dim = latent_dim + LABEL_EMBED_DIMENSIONS
 
         self.latent_to_tensor = nn.Sequential(
             nn.Linear(input_dim, 128 * 2 * 2 * 2),
@@ -40,18 +42,15 @@ class Generator3D(nn.Module):
 
         # Instead of one big Sequential, break up the blocks to allow label input
         self.deconv1 = nn.ConvTranspose3d(128, 64, kernel_size=4, stride=2, padding=1)  # 4x4x4
-        self.cbn1 = ConditionalBatchNorm3d(64, self.embed_dim)
+        self.cbn1 = ConditionalBatchNorm3d(64, LABEL_EMBED_DIMENSIONS)
 
         self.deconv2 = nn.ConvTranspose3d(64, 32, kernel_size=4, stride=2, padding=1)   # 8x8x8
-        self.cbn2 = ConditionalBatchNorm3d(32, self.embed_dim)
+        self.cbn2 = ConditionalBatchNorm3d(32, LABEL_EMBED_DIMENSIONS)
 
         self.deconv3 = nn.ConvTranspose3d(32, 16, kernel_size=4, stride=2, padding=1)   # 16x16x16
-        self.cbn3 = ConditionalBatchNorm3d(16, self.embed_dim)
+        self.cbn3 = ConditionalBatchNorm3d(16, LABEL_EMBED_DIMENSIONS)
 
-        self.to_voxel = nn.Sequential(
-            nn.Conv3d(19, 1, kernel_size=3, padding=1),  # 16x16x16 + 3 for pos encoding
-            nn.Sigmoid()
-        )
+        self.to_voxel = nn.Conv3d(16 + 3, 1, kernel_size=3, padding=1)  # 16x16x16 + 3 for pos encoding
 
     def forward(self, z, label_embeddings):
         z = torch.cat((z, label_embeddings), dim=1)
@@ -89,21 +88,23 @@ class Generator3D(nn.Module):
 class Discriminator3D(nn.Module):
     def __init__(self):
         super().__init__()
-        self.label_embed_dim = 512
 
         self.conv_layers = nn.Sequential(
-            spectral_norm(nn.Conv3d(1, 16, kernel_size=4, stride=2, padding=1)),  # 8x8x8
+            nn.Conv3d(1, 16, kernel_size=4, stride=2, padding=1),  # 8x8x8, 16 channel
+            # nn.InstanceNorm3d(16, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
 
-            spectral_norm(nn.Conv3d(16, 32, kernel_size=4, stride=2, padding=1)),  # 4x4x4
+            nn.Conv3d(16, 32, kernel_size=4, stride=2, padding=1),  # 4x4x4, 32 channel
+            # nn.InstanceNorm3d(32, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
 
-            spectral_norm(nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1)),  # 2x2x2
+            nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1),  # 2x2x2, 64 channel
+            # nn.InstanceNorm3d(64, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
         )
 
-        self.fc = spectral_norm(nn.Linear(64 * 2 * 2 * 2, 1))
-        self.embed_proj = nn.Linear(self.label_embed_dim, 64 * 2 * 2 * 2)
+        self.fc = nn.Linear(64 * 2 * 2 * 2, 1)
+        self.embed_proj = nn.Linear(LABEL_EMBED_DIMENSIONS, 64 * 2 * 2 * 2)
 
     def forward(self, x, label_embeddings):
         batch_size = x.size(0)
@@ -115,21 +116,23 @@ class Discriminator3D(nn.Module):
         return out + projection
 
 
-def d_loss(real_scores, fake_scores):
+def discriminator_loss(real_scores, fake_scores):
     return fake_scores.mean() - real_scores.mean()
 
 
-def g_loss(fake_scores):
+def generator_loss(fake_scores):
     return -fake_scores.mean()
 
 
-def gradient_penalty(D, real, fake, label_embs, device='cpu'):
+def gradient_penalty(discriminator, real, fake, label_embs, device='cpu'):
     batch_size = real.size(0)
     epsilon = torch.rand(batch_size, 1, 1, 1, 1, device=device)
+
     interpolated = epsilon * real + (1 - epsilon) * fake
     interpolated.requires_grad_(True)
 
-    d_interpolated = D(interpolated, label_embs)
+    # old
+    d_interpolated = discriminator(interpolated, label_embs)
     gradients = torch.autograd.grad(
         outputs=d_interpolated,
         inputs=interpolated,
@@ -139,6 +142,20 @@ def gradient_penalty(D, real, fake, label_embs, device='cpu'):
         only_inputs=True
     )[0]
 
+    # new
+    # d_interpolated = discriminator.conv_layers(interpolated).reshape(batch_size, -1)
+    # d_interpolated_out = discriminator.fc(d_interpolated).squeeze(1)
+    # projection = torch.sum(discriminator.embed_proj(label_embs) * d_interpolated, dim=1)
+    # d_interpolated_combined = d_interpolated_out + projection
+    # gradients = torch.autograd.grad(
+    #     outputs=d_interpolated_combined,
+    #     inputs=interpolated,
+    #     grad_outputs=torch.ones_like(d_interpolated_combined),
+    #     create_graph=True,
+    #     retain_graph=True,
+    #     only_inputs=True
+    # )[0]
+
     gradients = gradients.view(batch_size, -1)
     grad_norm = gradients.norm(2, dim=1)
     penalty = ((grad_norm - 1) ** 2).mean()
@@ -147,7 +164,7 @@ def gradient_penalty(D, real, fake, label_embs, device='cpu'):
 
 class VoxelDataset(Dataset):
     def __init__(self, voxel_data, clip_embs):
-        self.data = torch.tensor(np.array(voxel_data)).unsqueeze(1).float()  # (N, 1, 16, 16, 16)
+        self.data = torch.tensor(np.array(voxel_data)).unsqueeze(1).float()  # (BATCH, 1, 16, 16, 16)
         self.clip_embs = clip_embs
 
     def __len__(self):
@@ -156,21 +173,34 @@ class VoxelDataset(Dataset):
     def __getitem__(self, idx):
         return self.data[idx], self.clip_embs[idx]
 
-def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_clip_cache=None, last_epoch=0, latent_dim=256, epochs=1000, batch_size=64,
-              lambda_gp=10, critic_iters=5):
+
+def train_gan(generator=None,
+              discriminator=None,
+              generator_optimiser=None,
+              discriminator_optimiser=None,
+              last_clip_cache=None,
+              last_epoch=0,
+              latent_dim=256,
+              epochs=100,
+              batch_size=64,
+              lambda_gp=10,
+              critic_iterations=5,
+              generator_iterations=1):
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     if generator is None:
         generator = Generator3D(latent_dim=latent_dim)
     if discriminator is None:
         discriminator = Discriminator3D()
-    if g_opt is None:
-        g_opt = optim.Adam(generator.parameters(), lr=1e-4, betas=(0.5, 0.9))
-    if d_opt is None:
-        d_opt = optim.Adam(discriminator.parameters(), lr=1e-4, betas=(0.5, 0.9))
+    if generator_optimiser is None:
+        generator_optimiser = optim.RMSprop(generator.parameters(), lr=1e-5, alpha=0.99)
+        # generator_optimiser = optim.Adam(generator.parameters(), lr=1e-4, betas=(0.0, 0.9))
+    if discriminator_optimiser is None:
+        discriminator_optimiser = optim.RMSprop(discriminator.parameters(), lr=1e-4, alpha=0.99)
+        # discriminator_optimiser = optim.Adam(discriminator.parameters(), lr=1e-4, betas=(0.0, 0.9))
 
-    clip_cache = last_clip_cache
-    if clip_cache is None:
-        clip_cache = {}
+    clip_cache = last_clip_cache if last_clip_cache is not None else {}
 
     generator.to(device)
     discriminator.to(device)
@@ -183,9 +213,10 @@ def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_c
         if text_label not in clip_cache:
             tokens = clip.tokenize([text_label]).to(device)
             with torch.no_grad():
-                clip_cache[text_label] = clip_model.encode_text(tokens).squeeze(0).float()
+                clip_cache[text_label] = clip_model.encode_text(tokens).squeeze(0).to(device).float()
         return clip_cache[text_label]
 
+    # epoch
     for epoch in range(last_epoch, last_epoch + epochs):
         input_labels, voxel_data_np = get_random_training_dataset(512)
         with torch.no_grad():
@@ -193,40 +224,44 @@ def train_gan(generator=None, discriminator=None, g_opt=None, d_opt=None, last_c
         dataset = VoxelDataset(voxel_data_np, clip_embs)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+        # batch
         for i, (real, clip_embs) in enumerate(dataloader):
             real = real.to(device)
+            clip_embs = clip_embs.to(device)
             batch_size_curr = real.size(0)
 
-            # train discriminator multiple times
-            for _ in range(critic_iters):
+            # train discriminator
+            for _ in range(critic_iterations):
                 z = torch.randn(batch_size_curr, latent_dim).to(device)
                 fake = generator(z, clip_embs).detach()
                 real_scores = discriminator(real, clip_embs)
                 fake_scores = discriminator(fake, clip_embs)
 
                 gp = gradient_penalty(discriminator, real, fake, clip_embs, device=device)
-                d_loss_val = d_loss(real_scores, fake_scores) + lambda_gp * gp
+                d_loss_val = discriminator_loss(real_scores, fake_scores) + lambda_gp * gp
 
-                d_opt.zero_grad()
+                discriminator_optimiser.zero_grad()
                 d_loss_val.backward()
-                d_opt.step()
+                discriminator_optimiser.step()
 
             # train generator
-            z = torch.randn(batch_size_curr, latent_dim).to(device)
-            fake = generator(z, clip_embs)
-            fake_scores = discriminator(fake, clip_embs)
-            g_loss_val = g_loss(fake_scores)
+            for _ in range(generator_iterations):
+                z = torch.randn(batch_size_curr, latent_dim).to(device)
+                fake = generator(z, clip_embs)
 
-            g_opt.zero_grad()
-            g_loss_val.backward()
-            g_opt.step()
+                fake_scores = discriminator(fake, clip_embs)
+                g_loss_val = generator_loss(fake_scores)
+
+                generator_optimiser.zero_grad()
+                g_loss_val.backward()
+                generator_optimiser.step()
 
         print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {d_loss_val.item():.2f} | G Loss: {g_loss_val.item():.2f} | GP: {gp.item():.2f}")
 
         if epoch > 0 and epoch % 100 == 0:
-            save_model(generator, discriminator, g_opt, d_opt, clip_cache, epoch)
+            save_model(generator, discriminator, generator_optimiser, discriminator_optimiser, clip_cache, epoch)
 
-    save_model(generator, discriminator, g_opt, d_opt, clip_cache, epoch + 1)
+    save_model(generator, discriminator, generator_optimiser, discriminator_optimiser, clip_cache, epoch + 1)
 
 
 def continue_training_gan():
@@ -248,25 +283,32 @@ def save_model(generator, discriminator, g_opt, d_opt, clip_cache, epoch):
     print("Checkpoint saved!")
 
 
-def load_model(file_path="data/model/gan-checkpoint-1200.pth"):
+def load_model(file_path="data/model/gan-checkpoint-100.pth"):
     checkpoint = torch.load(file_path)
     generator = Generator3D(latent_dim=256)
     generator.load_state_dict(checkpoint['generator'])
     discriminator = Discriminator3D()
     discriminator.load_state_dict(checkpoint['discriminator'])
-    g_opt = optim.Adam(generator.parameters(), lr=2e-5, betas=(0.5, 0.9))
+
+    g_opt = optim.RMSprop(generator.parameters(), lr=1e-5, alpha=0.99)
+    # g_opt = optim.Adam(generator.parameters(), lr=2e-5, betas=(0.0, 0.9))
     g_opt.load_state_dict(checkpoint['g_optimizer'])
-    d_opt = optim.Adam(discriminator.parameters(), lr=2e-5, betas=(0.5, 0.9))
+
+    d_opt = optim.RMSprop(discriminator.parameters(), lr=1e-4, alpha=0.99)
+    # d_opt = optim.Adam(discriminator.parameters(), lr=2e-5, betas=(0.0, 0.9))
     d_opt.load_state_dict(checkpoint['d_optimizer'])
+
     clip_cache = checkpoint['clip_cache']
     epoch = checkpoint['epoch']
     print(f'Loading WGAN-SN (epoch {epoch})')
     return generator, discriminator, g_opt, d_opt, clip_cache, epoch
 
 
-def sample_gan(input_label, generator=None, latent_dim=256, device='cpu'):
+def sample_gan(input_label, generator=None, latent_dim=256,):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if generator is None:
         generator, discriminator, g_opt, d_opt, clip_cache, epoch = load_model()
+    generator.to(device)
     generator.eval()
 
     # text processing
@@ -280,5 +322,10 @@ def sample_gan(input_label, generator=None, latent_dim=256, device='cpu'):
         z = torch.randn(1, latent_dim).to(device)
         voxel = generator(z, label_emb)
         data_np = voxel.squeeze().cpu().numpy()
-        # binary = (voxel > 0.5).int().squeeze().cpu().numpy()  # Shape: (16, 16, 16)
-    return data_np
+
+    # clamp to 0-1
+    data_np = np.clip(data_np, 0.0, 1.0)
+
+    # denormalize block ids to 0-max_texture_id
+    data_3d = denormalize_block_ids(data_np)
+    return data_3d

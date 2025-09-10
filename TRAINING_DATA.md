@@ -1,0 +1,47 @@
+# Training Data
+This file documents types and variations of training data, how they are obtained and used.
+
+## File Types
+The following file types are associated with minecraft structures:
+- `.nbt` - used by Minecraft Java Edition, see [NBT format on Minecraft Wiki](https://minecraft.fandom.com/wiki/NBT_format)
+- `.snbt` - stringified NBT for readability
+- `.mcstructure` - used by Minecraft Bedrock Edition
+- `.schematic` - used by WorldEdit < 1.13, formatted in NBT
+- `.schem` - used by WorldEdit >= 1.13, formatted in NBT
+
+## Generate Training Data
+Training data could either be generated automatically (for simple structures), built manually, or scraped.
+Basic shapes can be used in early stages to help understand basic concepts like shapes, walls, or hollowness.
+Basic structures are great to introduce more complex concepts that are easy to augment.
+- **Basic Shapes** (see `/scripts/generation`)
+  - cuboid
+  - pyramid
+  - sphere
+- **Basic Structures**
+  - buildings (house, tower, pyramid, temple)
+  - decoration (bench, tent, well, shed, vehicle, lantern, statue, chimney, shelf, bridge, mine, planter, market stand,
+    street, wagon, barrel, crane, pipeline, fountain, logs, portal, canon, air balloon, smeltery, enchantment table,
+    boat)
+  - nature (tree, mushroom, rock, pond)
+
+## Data Augmentation
+Data augmentation is used to increase the variety of training data and help with generalization.
+- add small noise
+- transformations (see `/scripts/transformations`)
+  - flip
+  - rotate
+  - translate
+- replace/jitter material
+
+## Labels
+These are guidelines for writing labels for the training data to optimise generalization.
+- write 5-15 word phrases (e.g. small medieval stone house with a steep wooden roof and a chimney)
+- write 3-5 variations for language augmentation
+- describe the following aspects:
+  - structure & parts (e.g. house, roof)
+  - material (e.g. wood, stone, oak)
+  - shape (e.g. steep, gentle, round)
+  - styles (e.g. modern, medieval, fantasy)
+  - color (e.g. yellow, dark)
+  - size (e.g. small, large, long, tall)
+  - count
