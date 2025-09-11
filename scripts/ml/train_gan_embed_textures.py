@@ -7,6 +7,7 @@ import torch.optim as optim
 import clip
 from scripts.get_random_training_dataset import get_random_training_dataset
 from scripts.normalize_block_ids import get_max_block_id
+from scripts.visualize.visualize_voxel_grid import visualize_voxel_grid
 
 MODEL_NAME = "WGAN-GP"
 LABEL_EMBED_DIMENSIONS: int = 512  # CLIP ViT-B/32 output size
@@ -431,17 +432,40 @@ def train_gan(
         print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {discriminator_loss.item():.2f} | G Loss: {generator_loss.item():.2f} | GP: {gp.item():.2f}")
 
         # test generator results (to catch mode collapse early)
-        probabilities = torch.softmax(texture_logits / TEMPERATURE, dim=1)
-        ids, counts = torch.argmax(texture_logits, dim=1).unique(return_counts=True)
-        avg_probabilities = probabilities.mean(dim=(0, 2, 3, 4)).detach().cpu().numpy()
-        print("\tClasses: ", ids.detach().cpu().numpy())
-        print("\tCounts:  ", counts.detach().cpu().numpy())
-        print("\tProb:    ", np.round(avg_probabilities, 2))
+        # probabilities = torch.softmax(texture_logits / TEMPERATURE, dim=1)
+        # ids, counts = torch.argmax(texture_logits, dim=1).unique(return_counts=True)
+        # avg_probabilities = probabilities.mean(dim=(0, 2, 3, 4)).detach().cpu().numpy()
+        # print("\tClasses: ", ids.detach().cpu().numpy())
+        # print("\tCounts:  ", counts.detach().cpu().numpy())
+        # print("\tProb:    ", np.round(avg_probabilities, 2))
 
+        if epoch > 0 and epoch % 2 == 0:
+            clip_embedding = get_clip_embedding("gable house")
+            test_model(generator, clip_embedding, latent_dim, device)
         if epoch > 0 and epoch % 100 == 0:
             save_model(generator, discriminator, generator_optimiser, discriminator_optimiser, clip_cache, epoch)
 
     save_model(generator, discriminator, generator_optimiser, discriminator_optimiser, clip_cache, epoch + 1)
+
+
+def test_model(generator: Generator3D, clip_embedding: torch.Tensor, latent_dim: int, device: torch.device | str):
+    generator.eval()
+    with torch.no_grad():
+        z = torch.randn(1, latent_dim, device=device)
+        clip_embedding.to(device)
+        if clip_embedding.dim() == 1:
+            clip_embedding = clip_embedding.unsqueeze(0)  # -> [1, LABEL_EMBED_DIMENSIONS]
+        elif clip_embedding.dim() == 2 and clip_embedding.size(0) != 1:
+            # if user passed a batch >1, optionally handle it; here we sample only the first
+            clip_embedding = clip_embedding[:1, :]
+
+        voxel_data = generator.sample_texture_ids(z, clip_embedding)
+        if voxel_data.dim() == 5 and voxel_data.size(1) == 1:
+            voxel_data = voxel_data.squeeze(1)
+
+        data_np = voxel_data.squeeze(0).cpu().numpy()
+    visualize_voxel_grid(data_np)
+    generator.train()
 
 
 def continue_training_gan():

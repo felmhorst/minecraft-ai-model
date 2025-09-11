@@ -17,22 +17,33 @@ This project currently uses a Wasserstein GAN with gradient penalty and spectral
 │   │   └── training/     # training data
 │   ├── scripts/
 │   │   ├── conversion/   # data type & palette converisons
+│   │   ├── generation/   # data generation
 │   │   ├── ml/           # model training & prediction
-│   │   └── palette/      # block palette
-│   ├── TRAINING_DATA.md  # types of training data, how its obtained & used
-│   └── main.py
+│   │   ├── palette/      # block palette
+│   │   ├── schematic/
+│   │   ├── transformations/ # data transformation & augmentation
+│   │   ├── validation/
+│   │   └── visualize/
+│   ├── main.py
+│   ├── ML_GUIDELINES.md  # ML model & training information
+│   ├── README.md         # general project information
+│   └── TRAINING_DATA.md  # information on types of training data, how its obtained & used
 ```
 
 ## Getting started
-- (optional) Install cuda for your device
+### Installation
+1. create a virtual environment: `python -m venv .venv`
+2. (optional) Install CUDA for your device. With a CUDA, computations can run on the GPU rather than the CPU.
   - install cuda toolkit for you GPU, for example from [nvidia](https://developer.nvidia.com/cuda-downloads)
-  - install [pytorch with cuda](https://pytorch.org/get-started/locally/)
+  - you can check your CUDA version with `nvidia-smi` (see CUDA Version in the top right)
+3. Install [pytorch for CUDA or CPU](https://pytorch.org/get-started/locally/). When using CUDA, make sure the version matches the one from the previous step.
+4. Install the remaining packages. (CLIP `pip install git+https://github.com/openai/CLIP.git`, numpy, matplotlib, nbtlib)
+
+### Run the project
+`python main.py`
 
 **Notes:**
 - blockstates are taken from `%appdata%\.minecraft\versions\<version>\<version>.jar\assets\minecraft\blockstates` (jar must be unzipped)
-
-## Packages
-- CLIP: `pip install git+https://github.com/openai/CLIP.git`
 
 ## Getting Data
 - WorldEdit:
