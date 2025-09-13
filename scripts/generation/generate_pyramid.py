@@ -1,7 +1,17 @@
 import numpy as np
+from numpy import random
+
+from scripts.generation.get_random_material_with_label import get_random_material_with_label
 
 
-def generate_pyramid(position=(4, 4, 4), base_width=7, hollow=False, grid_size=16):
+def generate_pyramid(
+    position: tuple[int, int, int] = (4, 4, 4),
+    base_width: int = 7,
+    is_hollow: bool = False,
+    grid_size: int = 16,
+    solid_block_id: int = 1,
+) -> np.ndarray:
+    """generates a pyramid of the specified dimensions on a voxel grid"""
     # calculate height
     height = base_width // 2 + (1 if base_width % 2 != 0 else 0)
     start_x = position[0]
@@ -23,8 +33,8 @@ def generate_pyramid(position=(4, 4, 4), base_width=7, hollow=False, grid_size=1
 
         for z in range(z1, z2):
             for x in range(x1, x2):
-                if not hollow:
-                    grid[y, z, x] = 1
+                if not is_hollow:
+                    grid[y, z, x] = solid_block_id
                 else:
                     d_left = x - x1
                     d_right = (x2 - 1) - x
@@ -34,13 +44,16 @@ def generate_pyramid(position=(4, 4, 4), base_width=7, hollow=False, grid_size=1
                     # draw walls that are ≤ wall_thickness‑1 blocks thick
                     if (min(d_left, d_right, d_front, d_back) < wall_thickness
                             or layer_width <= wall_thickness * 2 - 1):
-                        grid[y, z, x] = 1
+                        grid[y, z, x] = solid_block_id
 
     return grid
 
 
-def generate_random_pyramid(hollow=False, grid_size=16):
-    """generates a pyramid of random size"""
+def generate_random_pyramid(
+    is_hollow: bool = False,
+    grid_size: int = 16
+) -> tuple[np.ndarray, str]:
+    """generates a pyramid of random size with a label"""
 
     # randomize size
     base_width = np.random.randint(5, grid_size)
@@ -51,6 +64,14 @@ def generate_random_pyramid(hollow=False, grid_size=16):
     start_x = np.random.randint(0, max_x)
     start_z = np.random.randint(0, max_z)
     start_y = 0
-    position = [start_x, start_y, start_z]
+    position = (start_x, start_y, start_z)
 
-    return generate_pyramid(position, base_width, hollow, grid_size)
+    # randomize material
+    material_id, material_label = get_random_material_with_label()
+
+    # label
+    size_label = np.random.choice(["big " if base_width > 8 else "small ", ""])
+    hollowness_label = np.random.choice(["hollow " if is_hollow else "solid ", ""])
+    label = f"{size_label}{hollowness_label}{material_label}pyramid"
+
+    return generate_pyramid(position, base_width, is_hollow, grid_size, material_id), label

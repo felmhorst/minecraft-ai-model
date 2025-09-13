@@ -1,7 +1,7 @@
 import numpy as np
 
 
-AIR_ID = 283
+AIR_ID = 0
 
 
 def trim_y(data_3d):

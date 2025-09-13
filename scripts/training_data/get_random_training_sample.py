@@ -4,7 +4,7 @@ from scripts.training_data.prepare_training_data import load_training_data
 from scripts.transformations.randomize_data import randomize_data
 
 
-def get_random_training_sample() -> tuple[str, np.ndarray]:
+def get_random_training_sample() -> tuple[np.ndarray, str]:
     data_groups = load_training_data()
 
     # random group
@@ -23,4 +23,4 @@ def get_random_training_sample() -> tuple[str, np.ndarray]:
 
     # randomize
     data_randomized = randomize_data(data_np)
-    return label, data_randomized
+    return data_randomized, label

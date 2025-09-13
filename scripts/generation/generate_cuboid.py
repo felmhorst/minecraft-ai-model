@@ -1,7 +1,19 @@
 import numpy as np
+from numpy import random
+
+from scripts.generation.get_random_material_with_label import get_random_material_with_label
 
 
-def generate_cuboid(position=(4, 4, 4), width=8, length=8, height=8, hollow=False, grid_size=16):
+def generate_cuboid(
+    position: tuple[int, int, int] = (4, 4, 4),
+    width: int = 8,
+    length: int = 8,
+    height: int = 8,
+    is_hollow: bool = False,
+    grid_size: int = 16,
+    solid_block_id: int = 1,
+) -> np.ndarray:
+    """generates a cuboid of the specified dimensions on a voxel grid"""
     start_x = position[0]
     start_y = position[1]
     start_z = position[2]
@@ -18,22 +30,25 @@ def generate_cuboid(position=(4, 4, 4), width=8, length=8, height=8, hollow=Fals
     for y in range(start_y, end_y):
         for z in range(start_z, end_z):
             for x in range(start_x, end_x):
-                if hollow:
-                    is_solid = (
-                            x == start_x or x == end_x - 1 or
-                            z == start_z or z == end_z - 1 or
-                            y == start_y or y == end_y - 1
+                if is_hollow:
+                    is_solid_voxel = (
+                        x == start_x or x == end_x - 1 or
+                        z == start_z or z == end_z - 1 or
+                        y == start_y or y == end_y - 1
                     )
-                    if is_solid:
-                        grid[y, z, x] = 1
+                    if is_solid_voxel:
+                        grid[y, z, x] = solid_block_id
                 else:
-                    grid[y, z, x] = 1
+                    grid[y, z, x] = solid_block_id
 
     return grid
 
 
-def generate_random_cuboid(hollow=False, grid_size=16):
-    """generates a cuboid of random size"""
+def generate_random_cuboid(
+    is_hollow: bool = False,
+    grid_size: int = 16
+) -> tuple[np.ndarray, str]:
+    """generates a cuboid of random size with a label"""
 
     # randomize size
     width = np.random.randint(5, grid_size)
@@ -46,6 +61,19 @@ def generate_random_cuboid(hollow=False, grid_size=16):
     start_x = np.random.randint(0, max_x)
     start_z = np.random.randint(0, max_z)
     start_y = 0
-    position = [start_x, start_y, start_z]
+    position = (start_x, start_y, start_z)
 
-    return generate_cuboid(position, width, length, height, hollow, grid_size)
+    # randomize material
+    material_id, material_label = get_random_material_with_label()
+
+    # label
+    is_cube = width == length and width == height
+    is_tall = height > width and height > length
+    shape_label = "cube" if is_cube else "cuboid"
+    tall_label = np.random.choice(["tall " if is_tall else "", ""])
+    hollowness_label = np.random.choice(["hollow " if is_hollow else "solid ", ""])
+    label = f"{tall_label}{hollowness_label}{material_label}{shape_label}"
+
+    return generate_cuboid(position, width, length, height, is_hollow, grid_size, material_id), label
+
+
