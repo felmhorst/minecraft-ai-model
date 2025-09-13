@@ -6,6 +6,13 @@ data for more minecraft-typical structures.
 
 This project currently uses a Wasserstein GAN with gradient penalty and spectral normalization.
 
+## Notes
+- [x] add solid cuboids etc. in training data (to oversample minority and combat mode collapse)
+- [ ] optimize training schedule
+  - [ ] find the optimal number of epochs to train on high occupancy_alpha
+- [ ] ~~experiment with larger batch size~~
+- [ ] ~~experiment with optimizer betas~~
+
 ## Project Structure
 ```
 ├── minecraft-ai/
@@ -32,7 +39,7 @@ This project currently uses a Wasserstein GAN with gradient penalty and spectral
 
 ## Getting started
 ### Installation
-1. create a virtual environment: `python -m venv .venv`
+1. create a virtual environment: `python -m venv .venv` and activate it: `.venv/Scripts/activate`
 2. (optional) Install CUDA for your device. With a CUDA, computations can run on the GPU rather than the CPU.
   - install cuda toolkit for you GPU, for example from [nvidia](https://developer.nvidia.com/cuda-downloads)
   - you can check your CUDA version with `nvidia-smi` (see CUDA Version in the top right)

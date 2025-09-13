@@ -50,7 +50,7 @@ def to_local_palette(global_data):
         global_palette_reverse = json.load(file)
         for local_id in range(len(global_data_set)):
             global_id = global_data_set[local_id]
-            block_string = global_palette_reverse[str(global_id)]
+            block_string = global_palette_reverse[str(global_id)]["name"]
             palette_mapping[global_id] = local_id
             local_palette[block_string] = local_id
     local_data = [palette_mapping.get(n, FALLBACK_ID) for n in global_data]  # todo: always set 0 to air

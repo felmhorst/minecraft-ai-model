@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 base_path = Path(__file__).parent
-global_palette_path = base_path / '..' / 'data' / 'palette' / 'block_type_to_id.json'
+global_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_type_to_id.json'
 
 
 def get_max_block_id():

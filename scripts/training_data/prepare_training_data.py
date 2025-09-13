@@ -7,9 +7,9 @@ from scripts.palette.strip_block_properties import strip_block_properties
 from scripts.schematic.load_schematic import load_schematic
 
 base_path = Path(__file__).parent
-schematic_list_path = base_path / '..' / 'data' / 'training' / 'schematics.json'
-training_data_path = base_path / '..' / 'data' / 'training' / 'training_data.json'
-schematic_folder_path = base_path / '..' / 'data' / 'base-schematics'
+schematic_list_path = base_path / '..' / '..' / 'data' / 'training' / 'schematics.json'
+training_data_path = base_path / '..' / '..' / 'data' / 'training' / 'training_data.json'
+schematic_folder_path = base_path / '..' / '..' / 'data' / 'base-schematics'
 
 
 def prepare_training_data():

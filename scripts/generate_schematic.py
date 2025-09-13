@@ -1,11 +1,9 @@
 from nbtlib import Compound, File, Int, List, Short, ByteArray, IntArray
 from scripts.conversion.palette_conversion import to_local_palette
-import numpy as np
 from scripts.conversion.array_conversion import convert_3d_data_to_1d
 from pathlib import Path
 # from scripts.ml.train_gan import sample_gan
 from scripts.ml.train_gan_embed_textures import sample_gan
-from scripts.normalize_block_ids import denormalize_block_ids
 
 base_path = Path(__file__).parent
 output_path = base_path / '..' / 'data' / 'output' / 'generated.schem'

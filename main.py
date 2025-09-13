@@ -3,7 +3,7 @@ import torch
 from scripts.conversion.nbt_conversion import nbt_to_json
 from scripts.generate_schematic import generate_schematic
 # from scripts.ml.train_gan import train_gan, continue_training_gan
-from scripts.ml.train_gan_embed_textures import train_gan, continue_training_gan
+from scripts.ml.train_gan_embed_textures import train_gan, continue_training_gan, train_gan_by_schedule
 
 # check CUDA
 print("torch version:", torch.__version__)
@@ -23,7 +23,6 @@ schematic_file = File(schematic, root_name='Schematic')
 schematic_file.save("data/output/test.schem", gzipped=True)
 print('saved schematic.')"""
 
-train_gan()
-# continue_training_gan()
-# generate_schematic('gable house')
-# nbt_to_json('data/output/generated.schem', 'data/output/generated.json')
+# train_gan_by_schedule()
+generate_schematic('steep gable roof house')
+nbt_to_json('data/output/generated.schem', 'data/output/generated.json')

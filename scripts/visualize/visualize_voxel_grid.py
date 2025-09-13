@@ -1,9 +1,40 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
+import json
+
+base_path = Path(__file__).parent
+global_reverse_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_id_to_type.json'
+
+FALLBACK_COLOR = "#000000"
 
 
 def visualize_voxel_grid(voxel_grid: np.ndarray):
     occupancy_grid = (voxel_grid > 0)
+    unique_voxels = np.unique(voxel_grid[voxel_grid != 0])
+
+    # set colors
+    colors = np.empty(voxel_grid.shape, dtype=object)
+    with open(global_reverse_palette_path, 'r') as file:
+        global_palette_reverse = json.load(file)
+        for block_id in unique_voxels:
+            filtered_grid = (voxel_grid == block_id)
+            block = global_palette_reverse.get(str(block_id), None)
+            colors[filtered_grid] = block["color"] if block else FALLBACK_COLOR
+
+    # swap axes for correct display
+    occupancy_grid = np.swapaxes(occupancy_grid, 0, 2)
+    colors = np.swapaxes(colors, 0, 2)
+
+    # draw plot
     ax = plt.figure().add_subplot(projection='3d')
-    ax.voxels(occupancy_grid, edgecolor='k')
+    ax.voxels(occupancy_grid, facecolors=colors, edgecolor='k')
+
+    # set axis scales
+    dx, dy, dz = occupancy_grid.shape
+    ax.set_box_aspect([dx, dy, dz])
+    ax.set_xlim([0, dx])
+    ax.set_ylim([0, dy])
+    ax.set_zlim([0, dz])
+
     plt.show()

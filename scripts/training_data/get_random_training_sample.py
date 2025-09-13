@@ -1,10 +1,10 @@
 import numpy as np
-from scripts.normalize_block_ids import normalize_block_ids
-from scripts.prepare_training_data import load_training_data
+from scripts.training_data.normalize_block_ids import normalize_block_ids
+from scripts.training_data.prepare_training_data import load_training_data
 from scripts.transformations.randomize_data import randomize_data
 
 
-def get_random_training_data():
+def get_random_training_sample() -> tuple[str, np.ndarray]:
     data_groups = load_training_data()
 
     # random group
@@ -15,12 +15,12 @@ def get_random_training_data():
     label_index = np.random.randint(0, len(group['labels']))
     label = group['labels'][label_index]
 
-    # random (schematic) data
+    # random voxel grid
     data_index = np.random.randint(0, len(group['data']))
     data = group['data'][data_index]
-    data_np = np.array(data, dtype=float)
-    data_normalized = normalize_block_ids(data_np)
+    data_np = np.array(data, dtype=int)
+    # data_normalized = normalize_block_ids(data_np)
 
     # randomize
-    data_randomized = randomize_data(data_normalized)
+    data_randomized = randomize_data(data_np)
     return label, data_randomized

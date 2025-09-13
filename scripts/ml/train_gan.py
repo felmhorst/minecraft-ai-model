@@ -2,11 +2,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
-from torch.nn.utils import spectral_norm
 import torch.optim as optim
 import clip
-from scripts.get_random_training_dataset import get_random_training_dataset
-from scripts.normalize_block_ids import get_max_block_id, denormalize_block_ids
+from scripts.training_data.get_random_training_dataset import get_random_training_dataset
+from scripts.training_data.normalize_block_ids import get_max_block_id, denormalize_block_ids
 
 MODEL_NAME = "WGAN-GP"
 LABEL_EMBED_DIMENSIONS = 512  # CLIP ViT-B/32

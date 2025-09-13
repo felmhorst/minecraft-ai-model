@@ -38,3 +38,7 @@ Texture embeddings are necessary to help the model learn the meaning of block/te
 they should not be passed to the model in a single dimension (i.e. ids).
 - **texture embedding dimensions** (`TEXTURE_EMBED_DIMENSIONS`): the number of dimensions to embed the texture. Should
   be between `sqrt(NUM_TEXTURES)` and `NUM_TEXTURES`.
+
+### Training Schedule
+- start with `alpha_occupancy` 2-3 (to help the model learn the real distribution), then gradually reduce it to 0
+- start with `lr=1e-4`, then gradually reduce it to `1e-5` or less. 
