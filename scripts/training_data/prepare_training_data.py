@@ -19,9 +19,9 @@ def prepare_training_data():
         schematic_list = json.load(file)
         for group in schematic_list['groups']:
             labels = group['labels']
-            files = group['files']
+            file_names = group['files']
             data_arr = []
-            for file_name in files:
+            for file_name in file_names:
                 data_arr.append(prepare_training_data_array(file_name))
             data_groups.append({
                 "labels": labels,
@@ -38,6 +38,7 @@ def prepare_training_data_array(file_name):
     local_data, local_palette = load_schematic(schematic_folder_path / file_name)
     stripped_data, stripped_palette = strip_block_properties(local_data, local_palette)
     global_data = to_global_palette(stripped_data, stripped_palette)
+    print(file_name, len(global_data))
     global_data3d = convert_1d_data_to_3d(global_data)
     global_data3d_list = global_data3d.tolist()
     return global_data3d_list

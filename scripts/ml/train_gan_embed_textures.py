@@ -328,7 +328,9 @@ def train_gan(
         lr: float = 1e-4,
         alpha_adversarial: float = 1.0,
         alpha_occupancy: float = 0.0,
-        alpha_texture: float = 0.0):
+        alpha_texture: float = 0.0
+):
+    """trains a GAN"""
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -342,6 +344,10 @@ def train_gan(
     if discriminator_optimiser is None:
         # discriminator_optimiser = optim.RMSprop(discriminator.parameters(), lr=1e-4, alpha=0.9)
         discriminator_optimiser = optim.Adam(discriminator.parameters(), lr=lr, betas=(0.5, 0.9))
+
+    # update learning rate
+    generator_optimiser.param_groups[0]['lr'] = lr
+    discriminator_optimiser.param_groups[0]['lr'] = lr
 
     clip_cache = last_clip_cache if last_clip_cache is not None else {}
 
@@ -441,46 +447,44 @@ def train_gan(
 
         print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {discriminator_loss.item():.2f} | G Loss: {generator_loss.item():.2f} | GP: {gp.item():.2f}")
 
-        # test generator results (to catch mode collapse early)
-        # probabilities = torch.softmax(texture_logits / TEMPERATURE, dim=1)
-        # ids, counts = torch.argmax(texture_logits, dim=1).unique(return_counts=True)
-        # avg_probabilities = probabilities.mean(dim=(0, 2, 3, 4)).detach().cpu().numpy()
-        # print("\tClasses: ", ids.detach().cpu().numpy())
-        # print("\tCounts:  ", counts.detach().cpu().numpy())
-        # print("\tProb:    ", np.round(avg_probabilities, 2))
-
-        if epoch > 0 and epoch % 10 == 0:
-            clip_embedding = get_clip_embedding("solid cuboid")
-            test_model(generator, clip_embedding, latent_dim, device)
-            clip_embedding = get_clip_embedding("solid pyramid")
-            test_model(generator, clip_embedding, latent_dim, device)
-            clip_embedding = get_clip_embedding("solid sphere")
-            test_model(generator, clip_embedding, latent_dim, device)
-            clip_embedding = get_clip_embedding("gable house")
-            test_model(generator, clip_embedding, latent_dim, device)
+        if epoch > 0 and epoch % 50 == 0:
+            labels = ["desert house", "gable house", "solid cuboid", "hollow cuboid"]
+            clip_embeddings = []
+            for label in labels:
+                clip_embeddings.append(get_clip_embedding(label))
+            test_model(generator, clip_embeddings, labels, latent_dim, device)
         if epoch > 0 and epoch % 100 == 0:
             save_model(generator, discriminator, generator_optimiser, discriminator_optimiser, clip_cache, epoch)
 
     save_model(generator, discriminator, generator_optimiser, discriminator_optimiser, clip_cache, epoch + 1)
 
 
-def test_model(generator: Generator3D, clip_embedding: torch.Tensor, latent_dim: int, device: torch.device | str):
+def test_model(
+        generator: Generator3D,
+        clip_embeddings: list[torch.Tensor],
+        labels: list[str],
+        latent_dim: int,
+        device: torch.device | str
+):
     generator.eval()
+    voxel_grids = []
     with torch.no_grad():
         z = torch.randn(1, latent_dim, device=device)
-        clip_embedding.to(device)
-        if clip_embedding.dim() == 1:
-            clip_embedding = clip_embedding.unsqueeze(0)  # -> [1, LABEL_EMBED_DIMENSIONS]
-        elif clip_embedding.dim() == 2 and clip_embedding.size(0) != 1:
-            # if user passed a batch >1, optionally handle it; here we sample only the first
-            clip_embedding = clip_embedding[:1, :]
+        for clip_embedding in clip_embeddings:
+            clip_embedding.to(device)
+            if clip_embedding.dim() == 1:
+                clip_embedding = clip_embedding.unsqueeze(0)  # -> [1, LABEL_EMBED_DIMENSIONS]
+            elif clip_embedding.dim() == 2 and clip_embedding.size(0) != 1:
+                # if user passed a batch >1, optionally handle it; here we sample only the first
+                clip_embedding = clip_embedding[:1, :]
 
-        voxel_data = generator.sample_texture_ids(z, clip_embedding)
-        if voxel_data.dim() == 5 and voxel_data.size(1) == 1:
-            voxel_data = voxel_data.squeeze(1)
+            voxel_data = generator.sample_texture_ids(z, clip_embedding)
+            if voxel_data.dim() == 5 and voxel_data.size(1) == 1:
+                voxel_data = voxel_data.squeeze(1)
 
-        data_np = voxel_data.squeeze(0).cpu().numpy()
-    visualize_voxel_grid(data_np)
+            data_np = voxel_data.squeeze(0).cpu().numpy()
+            voxel_grids.append(data_np)
+    visualize_voxel_grid(voxel_grids, labels)
     generator.train()
 
 
@@ -492,7 +496,7 @@ def continue_training_gan(
         alpha_occupancy: float = 0.0,
         alpha_texture: float = 0.0
 ):
-    generator, discriminator, g_opt, d_opt, clip_cache, epoch = load_model(file_path=f"data/model/gan-checkpoint-{last_epoch}.pth")
+    generator, discriminator, g_opt, d_opt, clip_cache, epoch = load_model(file_path=f"data/model/gan-checkpoint-{last_epoch}.pth", lr=lr)
     generator.train()
     discriminator.train()
     train_gan(generator, discriminator, g_opt, d_opt, clip_cache, epoch, epochs=epochs, lr=lr,
@@ -517,7 +521,7 @@ def save_model(
     print("Checkpoint saved!")
 
 
-def load_model(file_path: str = "data/model/gan-checkpoint-300.pth"):
+def load_model(file_path: str = "data/model/gan-checkpoint-300.pth", lr=1e-4):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # load checkpoint
     checkpoint = torch.load(file_path)
@@ -534,12 +538,12 @@ def load_model(file_path: str = "data/model/gan-checkpoint-300.pth"):
     discriminator.load_state_dict(checkpoint['discriminator'])
 
     # initialize generator optimiser
-    g_opt = optim.Adam(generator.parameters(), lr=2e-6, betas=(0.5, 0.9))
+    g_opt = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.9))
     # g_opt = optim.RMSprop(generator.parameters(), lr=5e-5, alpha=0.9)
     g_opt.load_state_dict(checkpoint['g_optimizer'])
 
     # initialize discriminator optimiser
-    d_opt = optim.Adam(discriminator.parameters(), lr=2e-6, betas=(0.5, 0.9))
+    d_opt = optim.Adam(discriminator.parameters(), lr=lr, betas=(0.5, 0.9))
     # d_opt = optim.RMSprop(discriminator.parameters(), lr=1e-4, alpha=0.9)
     d_opt.load_state_dict(checkpoint['d_optimizer'])
 
@@ -575,9 +579,10 @@ def sample_gan(
 
 
 def train_gan_by_schedule():
-    train_gan(epochs=100, lr=2e-4, alpha_adversarial=0.5, alpha_occupancy=3.0, alpha_texture=1.0)
-    continue_training_gan(last_epoch=100, epochs=100, lr=2e-4, alpha_adversarial=0.5, alpha_occupancy=1.0, alpha_texture=3.0)
+    train_gan(epochs=100, lr=2e-4, alpha_adversarial=0.2, alpha_occupancy=3.0, alpha_texture=0.4)
+    continue_training_gan(last_epoch=100, epochs=100, lr=2e-4, alpha_adversarial=1.0, alpha_occupancy=1.0, alpha_texture=1.0)
     continue_training_gan(last_epoch=200, epochs=100, lr=1e-4, alpha_adversarial=1.0, alpha_occupancy=0.5, alpha_texture=0.5)
+    continue_training_gan(last_epoch=300, epochs=100, lr=2e-5, alpha_adversarial=1.0, alpha_occupancy=0.2, alpha_texture=0.2)
     # continue_training_gan(last_epoch=50, epochs=50, lr=1e-4, alpha_occupancy=2.0, alpha_texture=2.0)
     # continue_training_gan(last_epoch=100, epochs=50, lr=5e-5, alpha_occupancy=1.0, alpha_texture=1.0)
     # continue_training_gan(last_epoch=150, epochs=50, lr=5e-5, alpha_occupancy=0.2, alpha_texture=0.2)

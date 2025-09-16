@@ -41,4 +41,7 @@ they should not be passed to the model in a single dimension (i.e. ids).
 
 ### Training Schedule
 - start with `alpha_occupancy` 2-3 (to help the model learn the real distribution), then gradually reduce it to 0
-- start with `lr=1e-4`, then gradually reduce it to `1e-5` or less. 
+- start with `lr=1e-4`, then gradually reduce it to `1e-5` or less.
+
+## Resources
+- [Learning a Probabilistic Latent Space of Object Shapes via 3D Generative-Adversarial Modeling](https://arxiv.org/pdf/1610.07584)

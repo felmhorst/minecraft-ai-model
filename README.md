@@ -9,9 +9,12 @@ This project currently uses a Wasserstein GAN with gradient penalty and spectral
 ## Notes
 - [x] add solid cuboids etc. in training data (to oversample minority and combat mode collapse)
 - [ ] optimize training schedule
-  - [ ] find the optimal number of epochs to train on high occupancy_alpha
-- [ ] ~~experiment with larger batch size~~
-- [ ] ~~experiment with optimizer betas~~
+- [ ] add time tracking
+- [ ] add visualization of multiple grids
+- [ ] add training data: cylinders, towers, desert houses
+- [ ] implement postprocessing
+- [ ] gumbel softmax
+- [ ] test SDF
 
 ## Project Structure
 ```
@@ -150,3 +153,4 @@ Problems:
 - add powered
 - when.AND (e.g. chiseled_bookshelf)
 - leaves (persistent, distance)
+

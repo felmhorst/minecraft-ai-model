@@ -45,3 +45,15 @@ These are guidelines for writing labels for the training data to optimise genera
   - color (e.g. yellow, dark)
   - size (e.g. small, large, long, tall)
   - count
+
+---
+
+# Postprocessing
+- replace floating blocks with air (no direct neighbours)
+- adjust multi-blocks by settings adjacent blocks (e.g. door)
+- adjust block states
+  - half: prefer side with a solid block (e.g. slab, stairs)
+  - axis: prefer axis with the same blocks (e.g. log)
+  - facing: prefer side with a solid block (e.g. stairs)
+  - shape: adjust based on surrounding blocks
+- jittering? (e.g. plants, moss/cracked block variants)

@@ -16,7 +16,7 @@ def get_random_training_dataset(size: int) -> tuple[list, list]:
     }
 
     for i in range(size):
-        draw = choice(["cuboid", "pyramid", "sphere", "other"], 1, p=[.2, .2, .2, .4])[0]
+        draw = choice(["cuboid", "pyramid", "sphere", "other"], 1, p=[.1, .1, .1, .7])[0]
         if draw == "other":
             data, label = get_random_training_sample()
         else:

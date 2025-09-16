@@ -102,7 +102,8 @@ def save_as_schematic(data_3d, output_path):
         "minecraft:spruce_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]": 5,
         "minecraft:dark_oak_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]": 6,
         "minecraft:spruce_slab[type=bottom,waterlogged=false]": 7,
-        "minecraft:dark_oak_slab[type=bottom,waterlogged=false]": 8
+        "minecraft:dark_oak_slab[type=bottom,waterlogged=false]": 8,
+        "minecraft:sandstone": 9
     }
 
     #local_data, local_palette = to_local_palette(data_flat)
