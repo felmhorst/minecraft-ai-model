@@ -4,6 +4,7 @@ from scripts.conversion.array_conversion import convert_3d_data_to_1d
 from pathlib import Path
 # from scripts.ml.train_gan import sample_gan
 from scripts.ml.train_gan_embed_textures import sample_gan
+from scripts.postprocessing.postprocess_schematic import postprocess_schematic
 
 base_path = Path(__file__).parent
 output_path = base_path / '..' / 'data' / 'output' / 'generated.schem'
@@ -78,7 +79,7 @@ def is_valid_data(data, palette):
 MAX_ID = 1105  # todo: calculate based on global palette
 
 
-def generate_schematic(input_label):
+def generate_schematic(input_label: str):
     """generates a schematic and saves it to data/output"""
     data_norm = sample_gan(input_label)
     # data_3d = denormalize_block_ids(data_norm)
@@ -91,7 +92,6 @@ def generate_schematic(input_label):
 
 def save_as_schematic(data_3d, output_path):
     shape = data_3d.shape
-    data_flat = convert_3d_data_to_1d(data_3d)
 
     local_palette = {
         "minecraft:air": 0,
@@ -106,8 +106,9 @@ def save_as_schematic(data_3d, output_path):
         "minecraft:sandstone": 9
     }
 
-    #local_data, local_palette = to_local_palette(data_flat)
+    data_3d, palette = postprocess_schematic(data_3d, local_palette)
 
-    schematic = to_schematic(data_flat, local_palette, shape[2], shape[0], shape[1])
+    data_flat = convert_3d_data_to_1d(data_3d)
+    schematic = to_schematic(data_flat, palette, shape[2], shape[0], shape[1])
     schematic_file = File(schematic, root_name='Schematic')
     schematic_file.save(output_path, gzipped=True)

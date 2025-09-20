@@ -186,7 +186,6 @@ class Discriminator3D(nn.Module):
         :param x: [batch_size, 1+TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
         :param label_embeddings: [batch_size, LABEL_EMBED_DIMENSIONS]
         :return: tensor of shape [batch_size], where each entry is the Wasserstein critic value for that sample
-
         """
         batch_size = x.size(0)
         features = self.conv_layers(x).reshape(batch_size, -1)  # [batch_size, 512]
@@ -521,7 +520,7 @@ def save_model(
     print("Checkpoint saved!")
 
 
-def load_model(file_path: str = "data/model/gan-checkpoint-300.pth", lr=1e-4):
+def load_model(file_path: str = "data/model/gan-checkpoint-400.pth", lr=1e-4):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # load checkpoint
     checkpoint = torch.load(file_path)

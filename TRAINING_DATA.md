@@ -3,11 +3,18 @@ This file documents types and variations of training data, how they are obtained
 
 ## File Types
 The following file types are associated with minecraft structures:
-- `.nbt` - used by Minecraft Java Edition, see [NBT format on Minecraft Wiki](https://minecraft.fandom.com/wiki/NBT_format)
+- `.nbt` (Named Binary Tag) - used by Minecraft Java Edition, see [NBT format on Minecraft Wiki](https://minecraft.fandom.com/wiki/NBT_format)
 - `.snbt` - stringified NBT for readability
 - `.mcstructure` - used by Minecraft Bedrock Edition
 - `.schematic` - used by WorldEdit < 1.13, formatted in NBT
 - `.schem` - used by WorldEdit >= 1.13, formatted in NBT
+
+## Voxel Grid
+Independent of the file type, the data is typically structured as a flat array, which represents a 3d array of the
+structure `[y, z, x]` with the following rules:
+- y: top > bottom
+- z: south > north
+- x: east > west
 
 ## Generate Training Data
 Training data could either be generated automatically (for simple structures), built manually, or scraped.
