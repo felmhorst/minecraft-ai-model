@@ -16,13 +16,15 @@ likelihood of mode collapse and vanishing gradients and thus makes the training 
 ### Generator
 
 ### Discriminator (Critic)
+- should use instance normalization (`InstanceNorm3d`)
+- can use spectral normalization to stabilize training
 
 ### Optimiser
 The optimiser updates the parameters of the generator or discriminator based on the gradients computed from the loss.
 There are two recommended options: RMSProp or Adam.
 (see this [paper on GAN-based generation of 3D data](https://www.sciencedirect.com/science/article/pii/S1361841524000252))
-- **Adam**: recommended for GAN (with `beta1 = 0.5`).
-- **RMSProp**: recommended for WGAN, but did not work well in my experiments.
+- **Adam**: recommended for GAN (with `beta1 = 0.5` or `0.0`).
+- **RMSProp**: recommended for WGAN. produced noisier outputs, but has slightly better generalization
 
 ### Positional Encoding
 Positional encoding helps the generator understand the position it is operating at and thus reduce artifacts. Don't
@@ -41,7 +43,7 @@ they should not be passed to the model in a single dimension (i.e. ids).
 
 ### Training Schedule
 - start with `alpha_occupancy` 2-3 (to help the model learn the real distribution), then gradually reduce it to 0
-- start with `lr=1e-4`, then gradually reduce it to `1e-5` or less.
+- start with `lr=2e-4`, then gradually reduce it to `1e-5` or less.
 
 ## Resources
 - [Learning a Probabilistic Latent Space of Object Shapes via 3D Generative-Adversarial Modeling](https://arxiv.org/pdf/1610.07584)

@@ -22,7 +22,7 @@ schematic_file = File(schematic, root_name='Schematic')
 schematic_file.save("data/output/test.schem", gzipped=True)
 print('saved schematic.')"""
 
-# train_gan_by_schedule()
 # prepare_training_data()
-generate_schematic('gable house')
-nbt_to_json('data/output/generated.schem', 'data/output/generated.json')
+train_gan_by_schedule()
+# generate_schematic('desert house')
+# nbt_to_json('data/output/generated.schem', 'data/output/generated.json')

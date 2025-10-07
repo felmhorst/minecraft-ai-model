@@ -16,10 +16,10 @@ This project currently uses a Wasserstein GAN with gradient penalty and spectral
 - [ ] fix bug: model saved twice when starting a new set of epochs
 
 **Model Improvements**
-- [ ] 3D CNN UNet-style generator
-- [ ] predict clean occupancy, then condition a texture head based on occupancy
-- [ ] unsigned distance field (UDF)
-- [ ] gumbel softmax
+- [ ] 3D CNN UNet-style generator with skip connections
+- [ ] project clip embeddings through MLP + LayerNorm
+- [x] feature-wise linear modulation (FiLM) on generator
+- [ ] higher learning rate for D
 
 ## Project Structure
 ```
