@@ -1,7 +1,9 @@
 import torch
 from scripts.conversion.nbt_conversion import nbt_to_json
 from scripts.generate_schematic import generate_schematic
+from scripts.ml.train_diffusion_model import train_diffusion_model
 from scripts.ml.train_gan_embed_textures import train_gan, continue_training_gan, train_gan_by_schedule
+from scripts.palette.generate_block_mapping import generate_block_mapping
 from scripts.training_data.prepare_training_data import prepare_training_data
 
 # check CUDA
@@ -22,7 +24,13 @@ schematic_file = File(schematic, root_name='Schematic')
 schematic_file.save("data/output/test.schem", gzipped=True)
 print('saved schematic.')"""
 
+# run this whenever changing /data/palette/block_whitelist.json
+# generate_block_mapping()
+
+# run this whenever changing /data/training/schematics.json
 # prepare_training_data()
-train_gan_by_schedule()
+
+train_diffusion_model()
+# train_gan_by_schedule()
 # generate_schematic('desert house')
 # nbt_to_json('data/output/generated.schem', 'data/output/generated.json')
