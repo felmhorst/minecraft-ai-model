@@ -15,10 +15,8 @@ import time
 
 MODEL_NAME = "WGAN-GP"
 LABEL_EMBED_DIMENSIONS: int = 512  # CLIP ViT-B/32 output size
-NUM_TEXTURES: int = get_max_block_id() + 1  # 9
-TEXTURE_EMBED_DIMENSIONS: int = 4
-
-TEMPERATURE: float = 1.0  # smooth logits during softmax
+NUM_TEXTURES: int = get_max_block_id() + 1
+TEXTURE_EMBED_DIMENSIONS: int = 8
 
 
 class FiLM3D(nn.Module):
@@ -175,11 +173,10 @@ class Generator3D(nn.Module):
         occupancy_logits, texture_logits = self.forward(z, label_embeddings)
         occupancy = udf_to_occupancy(occupancy_logits)
 
-        # Optionally include texture here:
-        # texture = torch.argmax(texture_logits, dim=1, keepdim=True)
-        # voxel_ids = occupancy * torch.clamp(texture, min=1)
+        texture_ids = torch.argmax(texture_logits, dim=1, keepdim=True)
+        voxel_ids = occupancy.int() * torch.clamp(texture_ids, min=1)
 
-        return occupancy.int()
+        return voxel_ids
 
     @staticmethod
     def get_positional_grid(size, device):
@@ -192,62 +189,48 @@ class Discriminator3D(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # max_norm caps the embedding
+        # Per-texture embeddings
         self.texture_embedding = nn.Embedding(NUM_TEXTURES, TEXTURE_EMBED_DIMENSIONS, max_norm=1.0)
 
-        # in_channels = TEXTURE_EMBED_DIMENSIONS + 1  # texture embedding + occupancy
-        in_channels = 1  # texture embedding + occupancy
+        # occupancy (1) + embedded texture channels
+        in_channels = 1 + TEXTURE_EMBED_DIMENSIONS
 
         self.conv_layers = nn.Sequential(
-            spectral_norm(nn.Conv3d(in_channels, 32, kernel_size=4, stride=2, padding=1)),  # [batch_size, 32, 8, 8, 8]
+            spectral_norm(nn.Conv3d(in_channels, 32, kernel_size=4, stride=2, padding=1)),
             nn.LeakyReLU(0.2, inplace=True),
 
-            spectral_norm(nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1)),  # [batch_size, 64, 4, 4, 4]
+            spectral_norm(nn.Conv3d(32, 64, kernel_size=4, stride=2, padding=1)),
             nn.LeakyReLU(0.2, inplace=True),
 
-            spectral_norm(nn.Conv3d(64, 128, kernel_size=4, stride=2, padding=1)),  # [batch_size, 128, 2, 2, 2]
+            spectral_norm(nn.Conv3d(64, 128, kernel_size=4, stride=2, padding=1)),
             nn.LeakyReLU(0.2, inplace=True),
 
-            spectral_norm(nn.Conv3d(128, 256, kernel_size=2, stride=1, padding=0)),  # [batch_size, 256, 1, 1, 1]
+            spectral_norm(nn.Conv3d(128, 256, kernel_size=2, stride=1, padding=0)),
             nn.LeakyReLU(0.2, inplace=True),
         )
 
-        # flatten final features
         self.fc = spectral_norm(nn.Linear(256, 1))
+        self.embed_proj = nn.Linear(LABEL_EMBED_DIMENSIONS, 256)
 
-        self.embed_proj = nn.Linear(LABEL_EMBED_DIMENSIONS, 256)  # [batch_size, 512]
-
-    def forward(
-            self,
-            occupancy: torch.Tensor,
-            texture_logits: torch.Tensor,
-            label_embeddings: torch.Tensor,
-            already_embedded: bool = False) -> torch.Tensor:
+    def forward(self, occupancy, texture_data, label_embeddings, already_embedded=False):
         """
-        Calculates the Wasserstein critic values for a batch of samples.
-        :param occupancy: tensor of shape [batch_size, 1, 16, 16, 16]
-        :param texture_logits: tensor of shape [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16] (if already_embedded)
-        :param label_embeddings: tensor of shape [batch_size, LABEL_EMBED_DIMENSIONS]
-        :param already_embedded: boolean
-        :return: tensor of shape [batch_size], where each entry is the Wasserstein critic value for that sample
+        occupancy: [B, 1, 16, 16, 16]
+        texture_data:
+            if already_embedded=False → [B, 16, 16, 16] (IDs)
+            if already_embedded=True  → [B, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
         """
-        # embed texture_id to [TEXTURE_EMBED_DIMENSIONS]
         if not already_embedded:
-            texture_logits = self.texture_embedding(texture_logits)  # [batch_size, 16, 16, 16, TEXTURE_EMBED_DIMENSIONS]
-            texture_logits = texture_logits.permute(0, 4, 1, 2, 3)   # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+            # Embed integer texture IDs into dense channels
+            texture_emb = self.texture_embedding(texture_data)           # [B, 16,16,16,EMB]
+            texture_emb = texture_emb.permute(0, 4, 1, 2, 3).contiguous()  # [B, EMB,16,16,16]
+        else:
+            texture_emb = texture_data
 
-        # combine occupancy and texture
-        # x = torch.cat([occupancy.float(), texture_logits], dim=1)
-        x = occupancy.float()
-        batch_size = x.size(0)
-        features = self.conv_layers(x).reshape(batch_size, -1)  # [batch_size, 256]
-
-        out = self.fc(features).squeeze(1)  # [batch_size]
-
-        # evaluate label consistency
-        projection = torch.sum(self.embed_proj(label_embeddings) * features, dim=1)  # [batch_size]
-
-        return out + projection  # [batch_size]
+        x = torch.cat([occupancy.float(), texture_emb.float()], dim=1)  # [B, 1+EMB,16,16,16]
+        features = self.conv_layers(x).reshape(x.size(0), -1)
+        out = self.fc(features).squeeze(1)
+        proj = torch.sum(self.embed_proj(label_embeddings) * features, dim=1)
+        return out + proj
 
     def forward_combined_embeddings(
             self,
@@ -297,6 +280,7 @@ def calculate_gradient_penalty(
         fake_occupancy_logits: torch.Tensor,
         fake_texture_logits: torch.Tensor,
         label_embeddings: torch.Tensor,
+        temperature: float = 1.0,
         device: str | torch.device = 'cpu',
 ) -> torch.Tensor:
     """
@@ -308,6 +292,7 @@ def calculate_gradient_penalty(
     :param fake_texture_logits: batch of texture logits from generator, tensor of shape
         [batch_size, NUM_TEXTURES, 16, 16, 16]
     :param label_embeddings: tensor of shape [batch_size, LABEL_EMBED_DIMENSIONS]
+    :param temperature: temperature for textures, float
     :param device: cpu or cuda
     :return: gradient penalty of shape [] (a single scalar)
     """
@@ -316,21 +301,13 @@ def calculate_gradient_penalty(
     batch_size = real_occupancy.size(0)
     epsilon = torch.rand(batch_size, 1, 1, 1, 1, device=device)  # [batch_size, 1, 1, 1, 1]
 
-    # embed textures (real batch)
-    # real_texture_embed = discriminator.texture_embedding(real_textures).permute(0, 4, 1, 2, 3)  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
+    # embed real textures
+    real_tex_emb = discriminator.texture_embedding(real_textures).permute(0, 4, 1, 2, 3)  # [B, EMB, 16,16,16]
+    fake_tex_probs = torch.softmax(fake_texture_logits / temperature, dim=1)
+    fake_tex_emb = torch.einsum("bndhw,ne->bedhw", fake_tex_probs, discriminator.texture_embedding.weight)
 
-    # embed textures (generated batch)
-    # fake_texture_probs = torch.softmax(fake_texture_logits / TEMPERATURE, dim=1)  # [batch_size, NUM_TEXTURES, 16, 16, 16] (ratios)
-    # fake_texture_embed = torch.einsum("bndhw,ne->bedhw", fake_texture_probs, discriminator.texture_embedding.weight)  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
-
-    fake_occupancy_probs = torch.sigmoid(fake_occupancy_logits).float()  # [batch_size, 1, 16, 16, 16]
-    real_occupancy_float = real_occupancy.float()  # [batch_size, 1, 16, 16, 16]
-
-    # combine occupancy + texture
-    # real_x = torch.cat([real_occupancy_float, real_texture_embed], dim=1)
-    # fake_x = torch.cat([fake_occupancy_probs, fake_texture_embed], dim=1)
-    real_x = real_occupancy_float
-    fake_x = fake_occupancy_probs
+    real_x = torch.cat([real_occupancy.float(), real_tex_emb], dim=1)
+    fake_x = torch.cat([torch.sigmoid(fake_occupancy_logits), fake_tex_emb], dim=1)
 
     # interpolate gradients between real and fake
     interpolated = epsilon * real_x + (1 - epsilon) * fake_x  # [batch_size, TEXTURE_EMBED_DIMENSIONS, 16, 16, 16]
@@ -350,32 +327,10 @@ def calculate_gradient_penalty(
         only_inputs=True
     )[0]
 
-    # # compute per-voxel squared norms
-    # gradients_sq = gradients.pow(2)  # [batch_size, 1+TEXTURE_EMBED_DIM, 16, 16, 16]
-    #
-    # # compute squared occupancy gradient
-    # occupancy_per_voxel_sq = gradients_sq[:, 0, ...]  # [batch_size, 16, 16, 16]
-    # occupancy_gradient_sq = occupancy_per_voxel_sq.sum(dim=[1, 2, 3])  # [batch_size]
-    #
-    # # computed weighted squared texture gradient
-    # # the texture's gradient depends on the occupancy. an occupancy closer to 1 is more heavily penalized
-    # texture_per_voxel_sq = gradients_sq[:, 1:, ...].sum(dim=1)  # [batch_size, 16, 16, 16]
-    # occupancy_interpolated = interpolated[:, 0, ...]  # [batch_size, 16, 16, 16]
-    # weighted_texture_sq = texture_per_voxel_sq * occupancy_interpolated  # [batch_size, 16, 16, 16]
-    # texture_gradient_sq = weighted_texture_sq.sum(dim=[1, 2, 3])  # [batch_size]
-    #
-    # # combine gradients + compute penalty
-    # gradient_norm = torch.sqrt(occupancy_gradient_sq + texture_gradient_sq + 1e-12)
-    # gradient_penalty = ((gradient_norm - 1) ** 2).mean()  # [] (single scalar)
-
-    # Norm over spatial + channel dims (just occupancy channel here)
-    gradients = gradients.view(batch_size, -1)  # [B, 1*16*16*16]
-    gradient_norm = gradients.norm(2, dim=1)  # [B]
-
-    # WGAN-GP penalty
-    gradient_penalty = ((gradient_norm - 1) ** 2).mean()
-
-    return gradient_penalty
+    gradients = gradients.view(batch_size, -1)
+    grad_norm = gradients.norm(2, dim=1)
+    gp = ((grad_norm - 1) ** 2).mean()
+    return gp
 
 
 class VoxelDataset(Dataset):
@@ -409,7 +364,8 @@ def train_gan(
         lr: float = 1e-4,
         alpha_adversarial: float = 1.0,
         alpha_occupancy: float = 0.0,
-        alpha_texture: float = 0.0
+        alpha_texture: float = 0.0,
+        temperature: float = 1.0,
 ):
     """trains a GAN"""
     start_time = time.time()
@@ -465,10 +421,10 @@ def train_gan(
         # batch
         for i, (real_occupancy, real_textures, clip_embs) in enumerate(dataloader):
             # real_occupancy = real_occupancy.to(device).long()
-            real_occupancy = occupancy_to_udf(real_occupancy).to(device)
+            real_occupancy_udf = occupancy_to_udf(real_occupancy).to(device)
             real_textures = real_textures.to(device).long()
             clip_embs = clip_embs.to(device)
-            batch_size_current = real_occupancy.size(0)
+            batch_size_current = real_occupancy_udf.size(0)
 
             # train discriminator
             for _ in range(discriminator_iterations):
@@ -484,12 +440,13 @@ def train_gan(
                 # fake_occupancy = (occupancy_probabilities > 0.5).long()
 
                 # real_embed and fake_embed are handled inside gradient_penalty
-                real_scores = discriminator(real_occupancy, real_textures, clip_embs)  # IDs → embedded internally
-                fake_texture_probs = torch.softmax(texture_logits / TEMPERATURE, dim=1)
+                real_scores = discriminator(real_occupancy_udf, real_textures, clip_embs)  # IDs → embedded internally
+                fake_texture_probs = torch.softmax(texture_logits / temperature, dim=1)
                 fake_texture_embed = torch.einsum("bndhw,ne->bedhw", fake_texture_probs, discriminator.texture_embedding.weight)
                 fake_scores = discriminator(occupancy_probabilities, fake_texture_embed, clip_embs, already_embedded=True)
 
-                gp = calculate_gradient_penalty(discriminator, real_occupancy, real_textures, occupancy_logits, texture_logits, clip_embs, device=device)
+                gp = calculate_gradient_penalty(discriminator, real_occupancy_udf, real_textures, occupancy_logits,
+                                                texture_logits, clip_embs, temperature=temperature, device=device)
                 discriminator_loss = calculate_discriminator_loss(real_scores, fake_scores) + lambda_gp * gp
 
                 discriminator_optimiser.zero_grad()
@@ -502,7 +459,7 @@ def train_gan(
                 occupancy_logits, texture_logits = generator(z, clip_embs)
                 occupancy_probabilities = torch.sigmoid(occupancy_logits)
 
-                fake_texture_probs = torch.softmax(texture_logits / TEMPERATURE, dim=1)
+                fake_texture_probs = torch.softmax(texture_logits / temperature, dim=1)
                 fake_texture_embed = torch.einsum("bndhw,ne->bedhw", fake_texture_probs, discriminator.texture_embedding.weight)
 
                 fake_scores = discriminator(occupancy_probabilities, fake_texture_embed, clip_embs, already_embedded=True)
@@ -511,13 +468,15 @@ def train_gan(
                 # occupancy_loss = nn.functional.binary_cross_entropy_with_logits(occupancy_logits, real_occupancy.float())
 
                 l1_loss_fn = nn.L1Loss()
-                occupancy_loss = l1_loss_fn(occupancy_probabilities, real_occupancy.float())
+                occupancy_loss = l1_loss_fn(occupancy_probabilities, real_occupancy_udf.float())
 
                 # calculate texture loss (where occupancy > 0)
-                mask = (real_textures > 0)  # [batch_size, 16, 16, 16]
+                mask = (real_occupancy > 0).squeeze(1)  # [B,16,16,16] -> adjust threshold for your scale
                 if mask.any():
-                    texture_logits = texture_logits.permute(0, 2, 3, 4, 1)  # [batch_size, 16, 16, 16, NUM_TEXTURES]
-                    texture_loss = nn.functional.cross_entropy(texture_logits[mask], real_textures[mask])
+                    # compute CE only where mask==True
+                    texture_logits_flat = texture_logits.permute(0, 2, 3, 4, 1)[mask]  # [N, NUM_TEXTURES]
+                    real_textures_flat = real_textures[mask]  # [N]
+                    texture_loss = F.cross_entropy(texture_logits_flat, real_textures_flat)
                 else:
                     texture_loss = torch.tensor(0.0, device=device)
 
@@ -533,8 +492,8 @@ def train_gan(
 
         print(f"Epoch {epoch + 1}/{last_epoch + epochs} | D Loss: {discriminator_loss.item():.2f} | G Loss: {generator_loss.item():.2f} | GP: {gp.item():.2f}")
 
-        if epoch > 0 and epoch % 100 == 0:
-            labels = ["gable house", "steep gable roof house", "a-frame house", "desert house", "solid pyramid", "hollow cuboid"]
+        if epoch % 100 == 0:
+            labels = ["gable house", "spruce house with a chimney", "a-frame house", "desert house", "solid pyramid", "hollow cuboid"]
             clip_embeddings = []
             for label in labels:
                 clip_embeddings.append(get_clip_embedding(label))
@@ -583,13 +542,15 @@ def continue_training_gan(
         lr: float = 1e-4,
         alpha_adversarial: float = 1.0,
         alpha_occupancy: float = 0.0,
-        alpha_texture: float = 0.0
+        alpha_texture: float = 0.0,
+        temperature: float = 1.0,
 ):
     generator, discriminator, g_opt, d_opt, clip_cache, epoch = load_model(file_path=f"data/model/gan-checkpoint-{last_epoch}.pth", lr=lr)
     generator.train()
     discriminator.train()
     train_gan(generator, discriminator, g_opt, d_opt, clip_cache, epoch, epochs=epochs, lr=lr,
-              alpha_adversarial=alpha_adversarial, alpha_occupancy=alpha_occupancy, alpha_texture=alpha_texture)
+              alpha_adversarial=alpha_adversarial, alpha_occupancy=alpha_occupancy, alpha_texture=alpha_texture,
+              temperature=temperature)
 
 
 def save_model(
@@ -611,7 +572,7 @@ def save_model(
     print("Checkpoint saved!")
 
 
-def load_model(file_path: str = "data/model/gan-checkpoint-400.pth", lr=1e-4):
+def load_model(file_path: str = "data/model/gan-checkpoint-900.pth", lr=1e-4):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # load checkpoint
     checkpoint = torch.load(file_path)
@@ -669,7 +630,35 @@ def sample_gan(
 
 
 def train_gan_by_schedule():
-    train_gan(epochs=100, lr=2e-4, alpha_adversarial=0.5, alpha_occupancy=1.0, alpha_texture=0.0)
-    continue_training_gan(last_epoch=100, epochs=100, lr=2e-4, alpha_adversarial=1.0, alpha_occupancy=0.6, alpha_texture=0.0)
-    continue_training_gan(last_epoch=200, epochs=100, lr=1e-4, alpha_adversarial=1.0, alpha_occupancy=0.3, alpha_texture=0.0)
-    continue_training_gan(last_epoch=300, epochs=100, lr=1e-5, alpha_adversarial=1.0, alpha_occupancy=0.1, alpha_texture=0.0)
+    # structure stabilization (10-20%)
+    train_gan(epochs=200, lr=1e-4, alpha_adversarial=0.1, alpha_occupancy=1.0, alpha_texture=0.1, temperature=2.0)
+    continue_training_gan(last_epoch=200, epochs=200, lr=1e-4, alpha_adversarial=0.2, alpha_occupancy=0.8,
+                          alpha_texture=0.3, temperature=1.6)
+    # distribution refinement (60%)
+    continue_training_gan(last_epoch=400, epochs=100, lr=1e-4, alpha_adversarial=0.3, alpha_occupancy=0.6,
+                          alpha_texture=0.4, temperature=1.4)
+    continue_training_gan(last_epoch=500, epochs=100, lr=1e-4, alpha_adversarial=0.5, alpha_occupancy=0.5,
+                          alpha_texture=0.6, temperature=1.2)
+    continue_training_gan(last_epoch=600, epochs=100, lr=1e-4, alpha_adversarial=0.7, alpha_occupancy=0.3,
+                          alpha_texture=0.8, temperature=1.0)
+    continue_training_gan(last_epoch=700, epochs=100, lr=5e-5, alpha_adversarial=0.9, alpha_occupancy=0.2,
+                          alpha_texture=0.9, temperature=0.8)
+    continue_training_gan(last_epoch=800, epochs=100, lr=2e-5, alpha_adversarial=1.0, alpha_occupancy=0.1,
+                          alpha_texture=1.0, temperature=0.6)
+    # fine-tuning (20-30%)
+    continue_training_gan(last_epoch=900, epochs=100, lr=2e-5, alpha_adversarial=1.3, alpha_occupancy=0.1,
+                          alpha_texture=0.6, temperature=0.5)
+    continue_training_gan(last_epoch=1000, epochs=100, lr=1e-5, alpha_adversarial=1.6, alpha_occupancy=0.1,
+                          alpha_texture=0.2, temperature=0.5)
+    continue_training_gan(last_epoch=1100, epochs=100, lr=1e-5, alpha_adversarial=1.5, alpha_occupancy=0.1,
+                          alpha_texture=0.1, temperature=0.5)
+    continue_training_gan(last_epoch=12000, epochs=100, lr=1e-4, alpha_adversarial=0.3, alpha_occupancy=0.05,
+                          alpha_texture=1.0, temperature=0.8)
+    continue_training_gan(last_epoch=1300, epochs=100, lr=1e-4, alpha_adversarial=0.6, alpha_occupancy=0.05,
+                          alpha_texture=0.7, temperature=0.6)
+    continue_training_gan(last_epoch=1400, epochs=100, lr=5e-5, alpha_adversarial=1.0, alpha_occupancy=0.05,
+                          alpha_texture=0.3, temperature=0.5)
+    continue_training_gan(last_epoch=1500, epochs=100, lr=2e-5, alpha_adversarial=1.2, alpha_occupancy=0.05,
+                          alpha_texture=0.1, temperature=0.5)
+    continue_training_gan(last_epoch=1600, epochs=100, lr=1e-5, alpha_adversarial=1.4, alpha_occupancy=0.05,
+                          alpha_texture=0.05, temperature=0.5)

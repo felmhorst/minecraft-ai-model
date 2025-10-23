@@ -1,14 +1,11 @@
 import json
-from pathlib import Path
-
-base_path = Path(__file__).parent
-global_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_type_to_id.json'
+from config.paths import BLOCK_WHITELIST
 
 
 def get_max_block_id():
-    with open(global_palette_path, 'r') as file:
-        block_ids = json.load(file)
-        return len(block_ids) - 1
+    with open(BLOCK_WHITELIST, 'r') as file:
+        blocks = json.load(file)
+        return len(blocks) - 1
 
 
 MAX_BLOCK_ID = get_max_block_id()

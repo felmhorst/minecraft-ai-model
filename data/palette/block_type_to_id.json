@@ -1,12 +1,1 @@
-{
-  "air": 0,
-  "stone_bricks": 1,
-  "stripped_spruce_log": 2,
-  "spruce_planks": 3,
-  "dark_oak_planks": 4,
-  "spruce_stairs": 5,
-  "dark_oak_stairs": 6,
-  "spruce_slab": 7,
-  "dark_oak_slab": 8,
-  "sandstone": 9
-}
+{"air": 0, "stone": 1, "stone_stairs": 2, "stone_slab": 3, "cobblestone": 4, "cobblestone_stairs": 5, "cobblestone_slab": 6, "cobblestone_wall": 7, "mossy_cobblestone": 8, "mossy_cobblestone_stairs": 9, "mossy_cobblestone_slab": 10, "mossy_cobblestone_wall": 11, "stone_bricks": 12, "stone_brick_stairs": 13, "stone_brick_slab": 14, "stone_brick_wall": 15, "mossy_stone_bricks": 16, "mossy_stone_brick_stairs": 17, "mossy_stone_brick_slab": 18, "mossy_stone_brick_wall": 19, "cracked_stone_bricks": 20, "sandstone": 21, "sandstone_stairs": 22, "sandstone_slab": 23, "sandstone_wall": 24, "cut_sandstone": 25, "cut_sandstone_slab": 26, "smooth_sandstone": 27, "smooth_sandstone_stairs": 28, "smooth_sandstone_slab": 29, "white_terracotta": 30, "oak_log": 31, "stripped_oak_log": 32, "oak_planks": 33, "oak_stairs": 34, "oak_slab": 35, "oak_fence": 36, "oak_fence_gate": 37, "oak_button": 38, "spruce_log": 39, "stripped_spruce_log": 40, "spruce_planks": 41, "spruce_stairs": 42, "spruce_slab": 43, "spruce_fence": 44, "spruce_fence_gate": 45, "spruce_button": 46, "dark_oak_log": 47, "stripped_dark_oak_log": 48, "dark_oak_planks": 49, "dark_oak_stairs": 50, "dark_oak_slab": 51, "dark_oak_fence": 52, "dark_oak_fence_gate": 53, "dark_oak_button": 54, "glass_pane": 55, "iron_bars": 56, "spruce_door": 57, "spruce_trapdoor": 58, "campfire": 59, "sand": 60, "dirt": 61, "grass_block": 62, "short_grass": 63, "ladder": 64}

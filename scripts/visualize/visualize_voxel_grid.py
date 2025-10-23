@@ -1,10 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
 import json
-
-base_path = Path(__file__).parent
-global_reverse_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_id_to_type.json'
+from config.paths import BLOCK_MAPPING_ID_TO_TYPE
 
 FALLBACK_COLOR = "#000000"
 
@@ -12,7 +9,7 @@ FALLBACK_COLOR = "#000000"
 def visualize_voxel_grid(
         voxel_grids: list[np.ndarray],
         labels: list[str],
-        cols: int = 2
+        cols: int = 3
 ):
     """Visualizes multiple voxel grids in a grid view"""
 
@@ -22,7 +19,7 @@ def visualize_voxel_grid(
     fig = plt.figure(figsize=(5 * cols, 5 * rows))
 
     # load palette
-    with open(global_reverse_palette_path, 'r') as file:
+    with open(BLOCK_MAPPING_ID_TO_TYPE, 'r') as file:
         global_palette_reverse = json.load(file)
 
     for i, voxel_grid in enumerate(voxel_grids):

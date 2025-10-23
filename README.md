@@ -16,7 +16,9 @@ This project currently uses a Wasserstein GAN with gradient penalty and spectral
 - [ ] fix bug: model saved twice when starting a new set of epochs
 
 **Model Improvements**
-- [ ] 3D CNN UNet-style generator with skip connections
+- [x] 3D CNN UNet-style generator with skip connections
+- [ ] full UNet-style generator (causes memory issues)
+- [ ] eikonal smoothness (to remove blotches & gaps)
 - [ ] project clip embeddings through MLP + LayerNorm
 - [x] feature-wise linear modulation (FiLM) on generator
 - [ ] higher learning rate for D

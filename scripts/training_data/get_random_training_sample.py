@@ -1,5 +1,4 @@
 import numpy as np
-from scripts.training_data.normalize_block_ids import normalize_block_ids
 from scripts.training_data.prepare_training_data import load_training_data
 from scripts.transformations.randomize_data import randomize_data
 
@@ -19,7 +18,6 @@ def get_random_training_sample() -> tuple[np.ndarray, str]:
     data_index = np.random.randint(0, len(group['data']))
     data = group['data'][data_index]
     data_np = np.array(data, dtype=int)
-    # data_normalized = normalize_block_ids(data_np)
 
     # randomize
     data_randomized = randomize_data(data_np)

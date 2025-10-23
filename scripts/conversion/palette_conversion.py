@@ -1,43 +1,32 @@
 import json
-from nbtlib import load
-
-from scripts.palette.block_representation_conversion import block_string_to_dict
-from scripts.conversion.nbt_conversion import nbt_to_dict
-from pathlib import Path
-
-base_path = Path(__file__).parent
-global_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_type_to_id.json'
-global_reverse_palette_path = base_path / '..' / '..' / 'data' / 'palette' / 'block_id_to_type.json'
-WARNING = '\033[93m'
-DEFAULT = '\033[0m'
+from config.colors import COLOR_WARNING, COLOR_DEFAULT
+from config.paths import BLOCK_MAPPING_TYPE_TO_ID, BLOCK_MAPPING_ID_TO_TYPE
 
 FALLBACK_ID = 0
 
 
-def generate_palette_mapping(local_palette):
+def get_palette_mapping(
+        local_palette: dict
+) -> dict:
     """returns a dict that maps each id in the local palette to an id in the global palette"""
-    palette_map = {}
-    with open(global_palette_path, 'r') as file:
+    palette_mapping = {}
+    with open(BLOCK_MAPPING_TYPE_TO_ID, 'r') as file:
         global_palette = json.load(file)
         for block_string, local_id in local_palette.items():
             if block_string not in global_palette:
-                print(f"{WARNING}Warning: Block '{block_string}' not found{DEFAULT}")
+                print(f"{COLOR_WARNING}Warning: Unknown block '{block_string}'. {COLOR_DEFAULT}")
+                palette_mapping[local_id] = FALLBACK_ID
                 continue
-            global_id = global_palette[block_string]
-            palette_map[local_id] = global_id
-    return palette_map
+            palette_mapping[local_id] = global_palette[block_string]
+    return palette_mapping
 
 
-def to_global_palette_from_file(nbt_file_path):
-    schematic = load(nbt_file_path)
-    blocks = schematic['Schematic']['Blocks']
-    local_data = nbt_to_dict(blocks['Data'])
-    local_palette = nbt_to_dict(blocks['Palette'])
-    return to_global_palette(local_data, local_palette)
-
-
-def to_global_palette(local_data, local_palette):
-    palette_mapping = generate_palette_mapping(local_palette)
+def to_global_palette(
+        local_data: list,
+        local_palette: dict
+) -> list:
+    """converts data + palette to normalized data"""
+    palette_mapping = get_palette_mapping(local_palette)
     global_data = [palette_mapping.get(n, FALLBACK_ID) for n in local_data]
     return global_data
 
@@ -46,7 +35,7 @@ def to_local_palette(global_data):
     local_palette = {}
     palette_mapping = {}
     global_data_set = list(set(global_data))
-    with open(global_reverse_palette_path, 'r') as file:
+    with open(BLOCK_MAPPING_ID_TO_TYPE, 'r') as file:
         global_palette_reverse = json.load(file)
         for local_id in range(len(global_data_set)):
             global_id = global_data_set[local_id]
