@@ -19,6 +19,7 @@ def get_random_training_dataset(size: int) -> tuple[list, list]:
         draw = choice(["cuboid", "pyramid", "sphere", "other"], 1, p=[.1, .1, .1, .7])[0]
         if draw == "other":
             data, label = get_random_training_sample()
+            data = (data > 0).astype(int)
         else:
             is_hollow = choice([True, False])
             data, label = generate_shape[draw](is_hollow=is_hollow)

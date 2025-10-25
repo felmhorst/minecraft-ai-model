@@ -32,5 +32,5 @@ print('saved schematic.')"""
 
 train_diffusion_model()
 # train_gan_by_schedule()
-# generate_schematic('desert house')
+generate_schematic('gable house')
 # nbt_to_json('data/output/generated.schem', 'data/output/generated.json')

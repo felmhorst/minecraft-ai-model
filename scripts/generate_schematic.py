@@ -7,8 +7,10 @@ from config.colors import COLOR_WARNING, COLOR_DEFAULT
 from config.paths import OUTPUT_PATH, BLOCK_MAPPING_ID_TO_TYPE, GLOBAL_BLOCK_PALETTE
 from scripts.conversion.palette_conversion import to_local_palette
 from scripts.conversion.array_conversion import convert_3d_data_to_1d
+from scripts.ml.train_diffusion_model import sample_diffusion_model
 from scripts.ml.train_gan_embed_textures import sample_gan
 from scripts.postprocessing.postprocess_schematic import postprocess_schematic
+from scripts.visualize.visualize_voxel_grid import visualize_voxel_grid
 
 
 def data_3d_to_schematic(data_3d):
@@ -20,8 +22,9 @@ def data_3d_to_schematic(data_3d):
 def to_schematic(data_flat, palette, w=16, h=16, l=16):
     """turns the data and palette into a schematic"""
     nbt_palette = Compound({key: Int(value) for key, value in palette.items()})
-    print(f"{COLOR_WARNING}Warning: Clipping block palette!{COLOR_DEFAULT}")
-    data_flat = np.clip(data_flat, 0, 127)  # todo: handle bigger block palettes
+    if np.max(data_flat > 127):
+        print(f"{COLOR_WARNING}Warning: Clipping block palette!{COLOR_DEFAULT}")
+        data_flat = np.clip(data_flat, 0, 127)  # todo: handle bigger block palettes
     nbt_data = ByteArray(data_flat)
 
     schematic = Compound({
@@ -83,12 +86,15 @@ MAX_ID = 1105  # todo: calculate based on global palette
 
 def generate_schematic(input_label: str):
     """generates a schematic and saves it to data/output"""
-    data_norm = sample_gan(input_label)
+    data_norm = sample_diffusion_model(input_label)
     save_as_schematic(data_norm, OUTPUT_PATH)
     # data_flat = convert_3d_data_to_1d(data_3d)
     # schematic = to_schematic_file(data_flat)
     # schematic.save(output_path, gzipped=True)
     print(f'Generated schematic to {OUTPUT_PATH}')
+    print(data_norm.shape)
+    # data_3d = data_norm.squeeze(0).cpu().numpy()
+    visualize_voxel_grid([data_norm], [input_label], cols=1)
 
 
 def save_as_schematic(data_3d, output_path):
