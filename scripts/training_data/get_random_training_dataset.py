@@ -16,10 +16,10 @@ def get_random_training_dataset(size: int) -> tuple[list, list]:
     }
 
     for i in range(size):
-        draw = choice(["cuboid", "pyramid", "sphere", "other"], 1, p=[.1, .1, .1, .7])[0]
+        draw = choice(["cuboid", "pyramid", "sphere", "other"], 1, p=[.4, .4, .2, 0])[0]
         if draw == "other":
             data, label = get_random_training_sample()
-            data = (data > 0).astype(int)
+            # data = (data > 0).astype(int)
         else:
             is_hollow = choice([True, False])
             data, label = generate_shape[draw](is_hollow=is_hollow)

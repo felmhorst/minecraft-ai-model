@@ -1,6 +1,7 @@
 import torch
 from scripts.conversion.nbt_conversion import nbt_to_json
 from scripts.generate_schematic import generate_schematic
+from scripts.ml.diffusion_texture_model import train_diffusion_vqvae_model
 from scripts.ml.train_diffusion_model import train_diffusion_model
 from scripts.ml.train_gan_embed_textures import train_gan, continue_training_gan, train_gan_by_schedule
 from scripts.palette.generate_block_mapping import generate_block_mapping
@@ -27,10 +28,12 @@ print('saved schematic.')"""
 # run this whenever changing /data/palette/block_whitelist.json
 # generate_block_mapping()
 
-# run this whenever changing /data/training/schematics.json
+# run this whenever changing above or /data/training/schematics.json
 # prepare_training_data()
 
-train_diffusion_model()
+# train_diffusion_model()
+# train_texture_diffusion_model()
+# train_diffusion_vqvae_model()
 # train_gan_by_schedule()
-generate_schematic('gable house')
-# nbt_to_json('data/output/generated.schem', 'data/output/generated.json')
+generate_schematic('solid sphere')
+nbt_to_json('data/output/generated.schem', 'data/output/generated.json')

@@ -1,5 +1,7 @@
 import json
 
+import numpy as np
+
 from config.paths import TRAINING_SCHEMATICS_LIST, TRAINING_DATA_LIST, SCHEMATICS_DIR
 from scripts.conversion.array_conversion import convert_1d_data_to_3d
 from scripts.conversion.palette_conversion import to_global_palette

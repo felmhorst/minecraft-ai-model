@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def convert_1d_data_to_3d(data, w=16, h=16, l=16):
+def convert_1d_data_to_3d(data, w=16, h=16, l=16) -> np.ndarray:
     """converts a flat array into a 3d array"""
     data_flat = np.array(data, dtype=int)
     data_3d = data_flat.reshape(h, l, w)

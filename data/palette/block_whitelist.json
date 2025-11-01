@@ -10,53 +10,8 @@
     "color": "#7E7E7E"
   },
   {
-    "name": "stone_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "stone_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
     "name": "cobblestone",
     "property_string": "",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "cobblestone_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "cobblestone_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "cobblestone_wall",
-    "property_string": "[up=true,north=low,east=low,south=low,west=low]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_cobblestone",
-    "property_string": "",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_cobblestone_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_cobblestone_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_cobblestone_wall",
-    "property_string": "[up=true,north=low,east=low,south=low,west=low]",
     "color": "#7E7E7E"
   },
   {
@@ -65,134 +20,9 @@
     "color": "#7E7E7E"
   },
   {
-    "name": "stone_brick_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "stone_brick_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "stone_brick_wall",
-    "property_string": "[up=true,north=low,east=low,south=low,west=low]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_stone_bricks",
-    "property_string": "",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_stone_brick_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_stone_brick_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "mossy_stone_brick_wall",
-    "property_string": "[up=true,north=low,east=low,south=low,west=low]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "cracked_stone_bricks",
-    "property_string": "",
-    "color": "#7E7E7E"
-  },
-  {
     "name": "sandstone",
     "property_string": "",
     "color": "#DED4A9"
-  },
-  {
-    "name": "sandstone_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "sandstone_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "sandstone_wall",
-    "property_string": "[up=true,north=low,east=low,south=low,west=low]",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "cut_sandstone",
-    "property_string": "",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "cut_sandstone_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "smooth_sandstone",
-    "property_string": "",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "smooth_sandstone_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "smooth_sandstone_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "white_terracotta",
-    "property_string": "",
-    "color": "#CFB19F"
-  },
-  {
-    "name": "oak_log",
-    "property_string": "[axis=y]",
-    "color": "#785B35"
-  },
-  {
-    "name": "stripped_oak_log",
-    "property_string": "[axis=y]",
-    "color": "#785B35"
-  },
-  {
-    "name": "oak_planks",
-    "property_string": "",
-    "color": "#755732"
-  },
-  {
-    "name": "oak_stairs",
-    "property_string": "[facing=east,half=bottom,shape=straight,waterlogged=false]",
-    "color": "#755732"
-  },
-  {
-    "name": "oak_slab",
-    "property_string": "[type=bottom,waterlogged=false]",
-    "color": "#755732"
-  },
-  {
-    "name": "oak_fence",
-    "property_string": "[north=true,east=true,south=true,west=true]",
-    "color": "#755732"
-  },
-  {
-    "name": "oak_fence_gate",
-    "property_string": "[facing=east,in_wall=false,open=false]",
-    "color": "#755732"
-  },
-  {
-    "name": "oak_button",
-    "property_string": "[face=ceiling,facing=east,powered=false]",
-    "color": "#755732"
   },
   {
     "name": "spruce_log",
@@ -220,21 +50,6 @@
     "color": "#755732"
   },
   {
-    "name": "spruce_fence",
-    "property_string": "[north=true,east=true,south=true,west=true]",
-    "color": "#755732"
-  },
-  {
-    "name": "spruce_fence_gate",
-    "property_string": "[facing=east,in_wall=false,open=false]",
-    "color": "#755732"
-  },
-  {
-    "name": "spruce_button",
-    "property_string": "[face=ceiling,facing=east,powered=false]",
-    "color": "#755732"
-  },
-  {
     "name": "dark_oak_log",
     "property_string": "[axis=y]",
     "color": "#422A15"
@@ -258,70 +73,5 @@
     "name": "dark_oak_slab",
     "property_string": "[type=bottom,waterlogged=false]",
     "color": "#422A15"
-  },
-  {
-    "name": "dark_oak_fence",
-    "property_string": "[north=true,east=true,south=true,west=true]",
-    "color": "#422A15"
-  },
-  {
-    "name": "dark_oak_fence_gate",
-    "property_string": "[facing=east,in_wall=false,open=false]",
-    "color": "#422A15"
-  },
-  {
-    "name": "dark_oak_button",
-    "property_string": "[face=ceiling,facing=east,powered=false]",
-    "color": "#422A15"
-  },
-  {
-    "name": "glass_pane",
-    "property_string": "[north=true,east=true,south=true,west=true]",
-    "color": "#FFFFFF"
-  },
-  {
-    "name": "iron_bars",
-    "property_string": "[east=false,north=false,south=false,west=false]",
-    "color": "#7E7E7E"
-  },
-  {
-    "name": "spruce_door",
-    "property_string": "[facing=east,half=lower,hinge=left,open=false,powered=true]",
-    "color": "#755732"
-  },
-  {
-    "name": "spruce_trapdoor",
-    "property_string": "[facing=east,half=bottom,open=false,powered=true,waterlogged=true]",
-    "color": "#755732"
-  },
-  {
-    "name": "campfire",
-    "property_string": "[facing=east,lit=false]",
-    "color": "#755732"
-  },
-  {
-    "name": "sand",
-    "property_string": "",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "dirt",
-    "property_string": "",
-    "color": "#DED4A9"
-  },
-  {
-    "name": "grass_block",
-    "property_string": "[snowy=false]",
-    "color": "#556F34"
-  },
-  {
-    "name": "short_grass",
-    "property_string": "",
-    "color": "#556F34"
-  },
-  {
-    "name": "ladder",
-    "property_string": "[facing=east]",
-    "color": "#755732"
   }
 ]
